@@ -1,0 +1,35 @@
+"County","Activity","Stops","Tours","StopsPerTour"
+"Clackamas, OR","Delivery",2180,2870,0.759581881533101
+"Clackamas, OR","Return",2425,2870,0.844947735191638
+"Clackamas, OR","Vehicle Service",124,2870,0.043205574912892
+"Clackamas, OR","Pick-up",1382,2870,0.481533101045296
+"Clackamas, OR","Other",125,2870,0.0435540069686411
+"Clackamas, OR","Break/Meal",160,2870,0.0557491289198606
+"Clackamas, OR","Transfer",1113,2870,0.38780487804878
+"Clark, WA","Delivery",418,1317,0.317388003037206
+"Clark, WA","Return",942,1317,0.715261958997722
+"Clark, WA","Pick-up",94,1317,0.0713743356112377
+"Clark, WA","Other",33,1317,0.0250569476082005
+"Clark, WA","Break/Meal",56,1317,0.0425208807896735
+"Clark, WA","Vehicle Service",50,1317,0.0379650721336371
+"Clark, WA","Transfer",914,1317,0.694001518602885
+"Multnomah, OR","Pick-up",3309,6276,0.527246653919694
+"Multnomah, OR","Return",5517,6276,0.87906309751434
+"Multnomah, OR","Delivery",4949,6276,0.788559592096877
+"Multnomah, OR","Vehicle Service",285,6276,0.0454110898661568
+"Multnomah, OR","Break/Meal",354,6276,0.0564053537284895
+"Multnomah, OR","Other",277,6276,0.0441363926067559
+"Multnomah, OR","Transfer",2103,6276,0.33508604206501
+"Washington, OR","Delivery",1971,2926,0.673615857826384
+"Washington, OR","Return",2488,2926,0.850307587149692
+"Washington, OR","Pick-up",973,2926,0.332535885167464
+"Washington, OR","Vehicle Service",133,2926,0.0454545454545455
+"Washington, OR","Break/Meal",147,2926,0.0502392344497608
+"Washington, OR","Other",99,2926,0.0338345864661654
+"Washington, OR","Transfer",1128,2926,0.385509227614491
+"External","Delivery",2708,3399,0.796704913209768
+"External","Return",1382,3399,0.406590173580465
+"External","Vehicle Service",112,3399,0.0329508679023242
+"External","Break/Meal",98,3399,0.0288320094145337
+"External","Other",38,3399,0.0111797587525743
+"External","Transfer",691,3399,0.203295086790232

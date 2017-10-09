@@ -1,0 +1,29 @@
+"Industry","Vehicle","N","Simulated","Target"
+"Agriculture","Light",3167,0.336163889183738,0.4
+"Agriculture","Medium",5043,0.535293493259739,0.52
+"Agriculture","Heavy",1211,0.128542617556523,0.08
+"Construction","Light",19718,0.680282904950837,0.71
+"Construction","Medium",6728,0.232120062101087,0.22
+"Construction","Heavy",2539,0.0875970329480766,0.07
+"Government","Light",16404,0.872460376555686,0.9
+"Government","Medium",1689,0.0898308690564834,0.07
+"Government","Heavy",709,0.0377087543878311,0.03
+"Health","Light",22581,0.950058902726355,0.96
+"Health","Medium",1187,0.0499410972736452,0.04
+"Hotel & Real Estate","Light",35457,0.923623954778713,0.93
+"Hotel & Real Estate","Medium",2932,0.0763760452212874,0.07
+"Manufacturing","Light",2358,0.283959537572254,0.36
+"Manufacturing","Medium",2908,0.35019267822736,0.35
+"Manufacturing","Heavy",3038,0.365847784200385,0.29
+"Other Services","Light",83563,0.856467863109453,0.89
+"Other Services","Medium",11743,0.120358317873871,0.09
+"Other Services","Heavy",2261,0.0231738190166757,0.02
+"Retail","Light",32927,0.637502420135528,0.68
+"Retail","Medium",12131,0.23486931268151,0.21
+"Retail","Heavy",6592,0.127628267182962,0.11
+"Transportation Handling","Light",556,0.0606854398602925,0.04
+"Transportation Handling","Medium",2198,0.239903951102379,0.22
+"Transportation Handling","Heavy",6408,0.699410609037328,0.74
+"Wholesale","Light",4801,0.248075233813879,0.29
+"Wholesale","Medium",7513,0.388208546478582,0.46
+"Wholesale","Heavy",7039,0.363716219707539,0.25

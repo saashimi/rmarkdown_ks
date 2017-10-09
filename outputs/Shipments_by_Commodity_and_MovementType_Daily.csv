@@ -1,0 +1,137 @@
+"SCTG","Commodity","Movement Type","Shipments"
+1,"Live animals/fish","II",16
+1,"Live animals/fish","IX",49
+1,"Live animals/fish","XI",42
+2,"Cereal grains","II",1
+2,"Cereal grains","IX",183
+2,"Cereal grains","XI",185
+2,"Cereal grains","XX",2
+3,"Other ag. prods.","II",190
+3,"Other ag. prods.","IX",2127
+3,"Other ag. prods.","XI",5019
+3,"Other ag. prods.","XX",5
+4,"Animal feed","II",15
+4,"Animal feed","IX",127
+4,"Animal feed","XI",75
+4,"Animal feed","XX",1
+5,"Meat/seafood","II",20
+5,"Meat/seafood","IX",152
+5,"Meat/seafood","XI",119
+6,"Milled grain prods.","II",50
+6,"Milled grain prods.","IX",286
+6,"Milled grain prods.","XI",90
+6,"Milled grain prods.","XX",1
+7,"Other foodstuffs","II",120
+7,"Other foodstuffs","IX",1136
+7,"Other foodstuffs","XI",481
+7,"Other foodstuffs","XX",6
+8,"Alcoholic beverages","II",56
+8,"Alcoholic beverages","IX",250
+8,"Alcoholic beverages","XI",176
+8,"Alcoholic beverages","XX",1
+10,"Building stone","II",4
+10,"Building stone","IX",13
+10,"Building stone","XI",12
+11,"Natural sands","II",38
+11,"Natural sands","IX",10
+11,"Natural sands","XI",57
+12,"Gravel","II",799
+12,"Gravel","IX",493
+12,"Gravel","XI",483
+13,"Nonmetallic minerals","II",7
+13,"Nonmetallic minerals","IX",28
+13,"Nonmetallic minerals","XI",58
+13,"Nonmetallic minerals","XX",2
+14,"Metallic ores","II",7
+14,"Metallic ores","IX",25
+14,"Metallic ores","XI",25
+14,"Metallic ores","XX",2
+15,"Coal","XI",11
+17,"Gasoline","II",70
+17,"Gasoline","IX",180
+17,"Gasoline","XI",60
+17,"Gasoline","XX",1
+18,"Fuel oils","II",45
+18,"Fuel oils","IX",96
+18,"Fuel oils","XI",42
+19,"Coal-n.e.c.","II",29
+19,"Coal-n.e.c.","IX",394
+19,"Coal-n.e.c.","XI",179
+20,"Basic chemicals","II",42
+20,"Basic chemicals","IX",221
+20,"Basic chemicals","XI",204
+20,"Basic chemicals","XX",242
+21,"Pharmaceuticals","II",10
+21,"Pharmaceuticals","IX",658
+21,"Pharmaceuticals","XI",83
+22,"Fertilizers","IX",86
+22,"Fertilizers","XI",113
+22,"Fertilizers","XX",2
+23,"Chemical prods.","II",20
+23,"Chemical prods.","IX",638
+23,"Chemical prods.","XI",196
+24,"Plastics/rubber","II",59
+24,"Plastics/rubber","IX",1399
+24,"Plastics/rubber","XI",356
+24,"Plastics/rubber","XX",4
+25,"Logs","II",5429
+25,"Logs","IX",8001
+25,"Logs","XI",6294
+26,"Wood prods.","II",304
+26,"Wood prods.","IX",1073
+26,"Wood prods.","XI",523
+26,"Wood prods.","XX",3
+27,"Newsprint/paper","II",12
+27,"Newsprint/paper","IX",477
+27,"Newsprint/paper","XI",160
+27,"Newsprint/paper","XX",14
+28,"Paper articles","II",118
+28,"Paper articles","IX",509
+28,"Paper articles","XI",108
+29,"Printed prods.","II",431
+29,"Printed prods.","IX",3069
+29,"Printed prods.","XI",945
+30,"Textiles/leather","II",2
+30,"Textiles/leather","IX",343
+30,"Textiles/leather","XI",42
+30,"Textiles/leather","XX",4
+31,"Nonmetal min. prods.","II",418
+31,"Nonmetal min. prods.","IX",752
+31,"Nonmetal min. prods.","XI",207
+31,"Nonmetal min. prods.","XX",3
+32,"Base metals","II",26
+32,"Base metals","IX",435
+32,"Base metals","XI",254
+32,"Base metals","XX",4
+33,"Articles-base metal","II",56
+33,"Articles-base metal","IX",965
+33,"Articles-base metal","XI",282
+33,"Articles-base metal","XX",13
+34,"Machinery","II",38
+34,"Machinery","IX",836
+34,"Machinery","XI",169
+34,"Machinery","XX",4
+35,"Electronics","II",687
+35,"Electronics","IX",7816
+35,"Electronics","XI",2463
+35,"Electronics","XX",12
+36,"Motorized vehicles","II",8
+36,"Motorized vehicles","IX",528
+36,"Motorized vehicles","XI",156
+36,"Motorized vehicles","XX",475
+37,"Transport equip.","IX",116
+37,"Transport equip.","XI",31
+38,"Precision instruments","II",8
+38,"Precision instruments","IX",1050
+38,"Precision instruments","XI",1530
+38,"Precision instruments","XX",1
+39,"Furniture","II",757
+39,"Furniture","IX",1935
+39,"Furniture","XI",1131
+39,"Furniture","XX",3
+40,"Misc. mfg. prods.","II",20
+40,"Misc. mfg. prods.","IX",335
+40,"Misc. mfg. prods.","XI",63
+41,"Waste/scrap","II",213
+41,"Waste/scrap","IX",137
+41,"Waste/scrap","XI",201

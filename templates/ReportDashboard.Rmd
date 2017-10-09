@@ -1,0 +1,2600 @@
+---
+title: "`r paste('Portland Freight Model:', SCENARIO_NAME, 'Scenario Summary')`"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    theme: yeti
+    css: "ReportDashboardStyles.css"
+---
+
+<!-- These comments are for code that will not be implemented in its -->
+<!-- form, but are kept as a record for possible functions that could be -->
+<!-- implemented for other cases. -->
+<!-- # These comments are for code temporarily not run to reduce build -->
+<!-- # time and debugging headaches. -->
+
+```{r Setup}
+opts_knit$set(root.dir = SYSTEM_APP_PATH)
+```
+
+```{r Map_Settings}
+shp_outline <- gUnaryUnion(shp)
+map_type <- "OpenStreetMap.HOT"
+
+prepTAZList <- prepTAZPolygons(shp = shp, group.by = "CountyState")
+TAZ.polys <- prepTAZList$shp
+colorFun <- prepTAZList$colorFun
+```
+
+```{r Common_Values}
+# TODO: vectors like these could be moved into an rFreight function
+tod_breaks30 <- seq(from = 0, to = 1440, by = 30)
+tod_labels30 <- c("12:00am - 12:29am", "12:30am - 12:59am", "1:00am - 1:29am", 
+                  "1:30am - 1:59am", "2:00am - 2:29am", "2:30am - 2:59am",
+                  "3:00am - 3:29am", "3:30am - 3:59am", "4:00am - 4:29am",
+                  "4:30am - 4:59am", "5:00am - 5:29am", "5:30am - 5:59am",
+                  "6:00am - 6:29am", "6:30am - 6:59am", "7:00am - 7:29am",
+                  "7:30am - 7:59am", "8:00am - 8:29am", "8:30am - 8:59am",
+                  "9:00am - 9:29am", "9:30am - 9:59am", "10:00am - 10:29am",
+                  "10:30am - 10:59am", "11:00am - 11:29am", "11:30am - 11:59am",
+                  "12:00pm - 12:29pm", "12:30pm - 12:59pm", "1:00pm - 1:29pm",
+                  "1:30pm - 1:59pm", "2:00pm - 2:29pm", "2:30pm - 2:59pm",
+                  "3:00pm - 3:29pm", "3:30pm - 3:59pm", "4:00pm - 4:29pm",
+                  "4:30pm - 4:59pm", "5:00pm - 5:29pm", "5:30pm - 5:59pm",
+                  "6:00pm - 6:29pm", "6:30pm - 6:59pm", "7:00pm - 7:29pm",
+                  "7:30pm - 7:59pm", "8:00pm - 8:29pm", "8:30pm - 8:59pm",
+                  "9:00pm - 9:29pm", "9:30pm - 9:59pm", "10:00pm - 10:29pm",
+                  "10:30pm - 10:59pm", "11:00pm - 11:29pm", "11:30pm - 11:59pm")
+
+tod_breaks60 <- seq(from = 0, to = 1440, by = 60)
+tod_labels60 <- c("12:00am - 12:59am", "1:00am - 1:59am", "2:00am - 2:59am",
+                  "3:00am - 3:59am", "4:00am - 4:59am", "5:00am - 5:59am",
+                  "6:00am - 6:59am", "7:00am - 7:59am", "8:00am - 8:59am",
+                  "9:00am - 9:59am", "10:00am - 10:59am", "11:00am - 11:59am",
+                  "12:00pm - 12:59pm", "1:00pm - 1:59pm", "2:00pm - 2:59pm",
+                  "3:00pm - 3:59pm", "4:00pm - 4:59pm", "5:00pm - 5:59pm",
+                  "6:00pm - 6:59pm", "7:00pm - 7:59pm", "8:00pm - 8:59pm",
+                  "9:00pm - 9:59pm", "10:00pm - 10:59pm", "11:00pm - 11:59pm")
+
+```
+
+```{r ggplot_Theme}
+theme_db <- theme_bw() + theme(plot.margin = unit(c(10,10,20,10),"pt")) # this should eventually be replaced with an RSG theme, which can be substituted for client themes in conjunction with the dashboard's css file in the YAML header
+```
+
+Overview
+============================================
+
+Summary {data-width=200}
+--------------------------------------------
+
+### About this Document
+
+This document is stand-alone interactive dashboard viewable from most modern Internet browsers. The dashboard is meant to be a high-level summary of an __rFreight__ scenario. All of the data, charts, and maps viewable in this dashboard are embedded directly into the HTML file, so users are encouraged to share their scenario results with others via this document. An Internet connection is necessary for the best user experience, but is not required.
+
+Users may navigate to different areas of the dashboard using the navigation bar at the top of the page, and may interact directly with most tables, charts, and maps.
+
+This document is best viewed using the most recent versions of the following web browsers:
+
+* [Google Chrome](https://www.google.com/chrome/browser/desktop/)
+* Microsoft Edge (Must be running Windows 10)
+
+Highlights {data-width=150}
+--------------------------------------------
+
+### Run Date
+
+```{r Run_Date_ValueBox}
+valueBox(Sys.Date(), "Model Run Date", icon = "fa-calendar")
+```
+
+### Run Duration
+
+```{r Run_Duration_ValueBox}
+value <- round(SCENARIO_RUN_DURATION, 1)
+caption <- paste0("Model Runtime (", attr(value, "units"), ")")
+valueBox(value, caption = caption, icon = "fa-clock-o")
+```
+
+### Synthesized Firms
+
+```{r Synthesized_Firms_ValueBox}
+value <- format(AllFirmsReg[, .N], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Synthesized Firms", icon = "fa-building-o")
+```
+
+### Shipments Delivered
+
+```{r Shipments_Delivered_ValueBox}
+value <- format(ft_trips[Activity %in% c("Delivery", "Pick-up"), .N], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Freight Shipments", icon = "fa-cube")
+```
+
+### Freight Truck Tours
+
+```{r Freight_Truck_Tours_ValueBox}
+value <- format(ft_trips[, uniqueN(TourID)], big.mark = ",", trim = TRUE)
+FreightTruckTours.ValueBox <- valueBox(value, caption = "Freight Truck Tours", icon = "fa-truck")
+FreightTruckTours.ValueBox
+```
+
+### Commercial Vehicle Tours
+
+```{r Commercial_Vehicle_Tours_ValueBox}
+value <- format(cv_trips[, .N, by = .(BusID, Vehicle, TourID)][, .N], big.mark = ",", trim = TRUE)
+CommercialVehicleTours.ValueBox <- valueBox(value, caption = "Commercial Vehicle Tours", icon = "fa-truck")
+CommercialVehicleTours.ValueBox
+```
+
+### Total Stops
+
+```{r Total_Stops_ValueBox}
+value <- format(cv_trips[Activity != "Return", .N] + ft_trips[Activity != "Return", .N],
+                 big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Total Stops", icon = "fa-map-marker")
+```
+
+### Intermediate Stops
+
+```{r Intermediate_Stops_ValueBox}
+value <- format(cv_trips[Scheduled == 0L, .N] + ft_trips[Scheduled == 0L, .N],
+                 big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Intermediate Stops", icon = "fa-cutlery")
+```
+
+
+Model Region Map {data-width=650}
+--------------------------------------------
+
+### Model Region and Traffic Analysis Zone (TAZ) System
+
+```{r Model_Region_Map}
+map <- leaflet() %>%
+  addProviderTiles(map_type, group = "Background Map") %>%
+  addLayersControl(
+    overlayGroups = "Background Map", options = layersControlOptions(collapsed = FALSE)
+  ) %>%
+  addLegend(position = "bottomright", pal = colorFun, values = levels(TAZ.polys@data[["Group"]])) %>%
+  addTAZPolygons()
+map
+```
+
+Charts {data-navmenu="Firm Synthesis"}
+============================================
+
+Highlights {data-width=150}
+--------------------------------------------
+
+### Synthesized Firms
+
+```{r Synthesized_Firms_ValueBox2}
+value <- format(AllFirmsReg[, .N], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Synthesized Firms", icon = "fa-building-o")
+```
+
+### Synthesized Employment
+
+```{r Synthesized_Employment_ValueBox}
+value <- format(AllFirmsReg[, sum(Emp)], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Synthesized Employees", icon = "fa-briefcase")
+```
+
+Chart Column 1 {data-width=283}
+--------------------------------------------
+
+### Firms by Industry
+
+```{r Chart_Firms_By_Industry}
+# Organize
+dat <- AllFirmsReg[, .N, by = .(Industry = Industry10)][order(Industry)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Firms_by_Industry_Reg.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "Industry", yvar = "N", ylabel = "Firms", xrotate = TRUE)
+```
+
+### Firms by Size
+
+```{r Chart_Firms_By_Size}
+# Organize
+dat <- AllFirmsReg[, .N, by = .(Size = esizecat)][order(Size)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Firms_by_Size_Reg.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "Size", yvar = "N", xlabel = "Firm Size Category", ylabel = "Firms", xrotate = TRUE)
+```
+
+Chart Column 2 {data-width=283}
+--------------------------------------------
+
+### Employment by Industry
+
+```{r Chart_Employment_By_Industry}
+# Organize
+dat <- AllFirmsReg[, .(Employees = sum(Emp)), by = .(Industry = Industry10)][order(Industry)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Employees_by_Industry_Reg.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "Industry", yvar = "Employees", xrotate = TRUE)
+```
+
+### Employment by Size
+
+```{r Chart_Employment_By_Size}
+# Organize
+dat <- AllFirmsReg[, .(Employees = sum(Emp)), by = .(Size = esizecat)][order(Size)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Employees_by_Size_Reg.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "Size", yvar = "Employees", xlabel = "Firm Size Category", xrotate = TRUE)
+```
+
+Chart Column 3 {.tabset .tabset-fade data-width=283}
+--------------------------------------------
+
+### Firms by Commodity Produced
+
+```{r Chart_Firms_By_Commodity_Produced}
+
+# Organize
+dat <- AllFirmsReg[!is.na(SCTG), .(SCTG)]
+dat <- dat[SCTGCodes, Commodity := factor(i.Label), on = "SCTG"]
+dat[, Commodity := factor(Commodity, levels = sort_levels(Commodity))]
+dat <- dat[, .N, by = .(SCTG, Commodity)][order(SCTG)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Firms_by_Commodity_Reg.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "Commodity", yvar = "N", xlabel = "Commodity Produced", ylabel = "Firms", coord_flip = TRUE)
+```
+
+### Firms by Industry and Size
+
+```{r Chart_Firms_By_Commodity_And_Size}
+# Organize
+dat <- AllFirmsReg[, .N, by = .(Industry = Industry10, Size = esizecat)][order(Industry, Size)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Firms_by_Commodity_and_Size_Reg.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "Industry", yvar = "N", fill = "Size", ylabel = "Firms", coord_flip = TRUE)
+```
+
+Maps {data-navmenu="Firm Synthesis"}
+============================================
+
+Column-1 {.tabset .tabset-fade}
+--------------------------------------------
+
+### Firms by Industry
+
+```{r Map_Firms_By_Industry}
+k <- 10
+map <- leaflet(width = "100%") %>%
+  addProviderTiles(map_type, group = "Background Map")
+map <- map %>% addTAZPoints(data = AllFirmsReg, shp = shp, TAZcol = "TAZ2", group = "Industry10",
+                            scale.factor = k) %>%
+  addTAZPolygons()
+map
+```
+
+> Note: Each data point represents `r comma(k)` firms and precise locations are illustrative as firms are only identified geographically at the TAZ-level.
+
+### Employment by Industry
+
+```{r Map_Employment_By_Industry}
+k <- 100
+map <- leaflet(shp) %>%
+  addProviderTiles(map_type, group = "Background Map")
+map <- map %>% addTAZPoints(data = AllFirmsReg, shp = shp, TAZcol = "TAZ2",
+                            group = "Industry10", weight = "Emp",
+                            scale.factor = k) %>%
+  addTAZPolygons()
+map
+```
+
+> Note: Each data point represents `r comma(k)` employees and precise locations are illustrative as firms are only identified geographically at the TAZ-level.
+
+### Firms by Size
+
+```{r Map_Firms_By_Size}
+k <- 10
+map <- leaflet(shp) %>%
+  addProviderTiles(map_type, group = "Background Map")
+map <- map %>% addTAZPoints(data = AllFirmsReg, shp = shp, TAZcol = "TAZ2",
+                            group = "esizecat", scale.factor = k) %>%
+  addTAZPolygons()
+map
+```
+
+> Note: Each data point represents `r comma(k)` firms and precise locations are illustrative as firms are only identified geographically at the TAZ-level.
+
+### Employment by Size
+
+```{r Map_Employment_By_Size}
+k <- 100
+map <- leaflet(shp) %>%
+  addProviderTiles(map_type, group = "Background Map")
+map <- map %>% addTAZPoints(data = AllFirmsReg, shp = shp, TAZcol = "TAZ2",
+                            group = "esizecat", weight = "Emp",
+                            scale.factor = k) %>%
+  addTAZPolygons()
+map
+```
+
+> Note: Each data point represents `r comma(k)` employees and precise locations are illustrative as firms are only identified geographically at the TAZ-level.
+
+
+Shipments {data-navmenu="Annual Shipments"}
+============================================
+
+Highlights {data-width=150}
+--------------------------------------------
+
+### Annual Shipments
+
+```{r Annual_Shipments_ValueBox}
+value <- format(AnnualShipments[, sum(NumShipments)], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Annual Shipments", icon = "fa-cube")
+```
+
+### Annual Shipments (II)
+
+```{r Annual_II_Shipments_ValueBox}
+value <- format(AnnualShipments[Movement.Type == "II", sum(NumShipments)], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Internal-to-Internal (II)", icon = "fa-arrows")
+```
+
+### Annual Shipments (IX)
+
+```{r Annual_IX_Shipments_ValueBox}
+value <- format(AnnualShipments[Movement.Type == "IX", sum(NumShipments)], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Internal-to-External (IX)", icon = "fa-arrow-up")
+```
+
+### Annual Shipments (XI)
+
+```{r Annual_XI_Shipments_ValueBox}
+value <- format(AnnualShipments[Movement.Type == "XI", sum(NumShipments)], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "External-to-Internal (XI)", icon = "fa-arrow-down")
+```
+
+### Annual Shipments (Export)
+
+```{r Annual_EX_Shipments_ValueBox}
+value <- format(AnnualShipments[Movement.Type == "EX", sum(NumShipments)], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Exports (EX)", icon = "fa-arrow-up")
+```
+
+### Annual Shipments (Import)
+
+```{r Annual_IM_Shipments_ValueBox}
+value <- format(AnnualShipments[Movement.Type == "IM", sum(NumShipments)], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Imports (IM)", icon = "fa-arrow-down")
+```
+
+
+Chart Column 1 {data-width=283}
+--------------------------------------------
+
+### Movement Type and Mode
+
+```{r Chart_Shipments_By_MovementType_And_Mode_Annual}
+# Organize
+dat <- AnnualShipments[, .(Shipments = sum(NumShipments)),
+                       by = .(Mode, `Movement Type` = Movement.Type)][order(Mode, `Movement Type`)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Shipments_by_MovementType_and_Mode.csv"), row.names = FALSE)
+
+# Plot
+p <- bar_plotter(dat, xvar = "Movement Type", yvar = "Shipments", fill = "Mode")
+p
+```
+
+> Note: "Mode" refers to the mode of the long distance movement.
+
+### Movement Type and Production/Consumption
+
+```{r Chart_Shipments_By_MovementType_And_ProCon_Annual}
+# Organize
+dat <- AnnualShipments[, .(Shipments = sum(NumShipments)), by = .(`Movement Type` = Movement.Type)]
+dat[`Movement Type` %in% c("II", "XI", "IM"), ProCon := "Consume"]
+dat[`Movement Type` %in% c("IX","EX"), ProCon := "Produce"]
+dat <- rbind(dat, dat[`Movement Type` == "II", .(`Movement Type`, Shipments, ProCon = "Produce")])
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Shipments_by_MovementType_and_ProductionConsumption.csv"), row.names = FALSE)
+
+# Plot
+p <- bar_plotter(dat, xvar = "Movement Type", yvar = "Shipments", fill = "ProCon")
+p
+```
+
+> Note: Internal-to-Internal shipments are counted as both production and consumption for the model region.
+
+Chart Column 2 {data-width=283}
+--------------------------------------------
+
+### Shipment Size
+
+```{r Chart_Shipments_By_ShipmentSize_Annual}
+# Organize
+dat <- AnnualShipments[, .(Shipments = sum(NumShipments)),
+                       by = .(`Shipment Size` = ShipmentSize)][order(`Shipment Size`)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Shipments_by_ShipmentSize.csv"), row.names = FALSE)
+
+# Plot
+p <- bar_plotter(dat, xvar = "Shipment Size", yvar = "Shipments", xrotate = TRUE, coord_flip = TRUE)
+p
+```
+
+### Shipment Size by Movement Type
+
+```{r Chart_Shipments_By_ShipmentSize_And_Movement_Type_Annual}
+# Organize
+dat <- AnnualShipments[, .(Shipments = sum(NumShipments)),
+                       by = .(`Shipment Size` = ShipmentSize, `Movement Type` = Movement.Type)][order(`Shipment Size`, `Movement Type`)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Shipments_by_ShipmentSize_and_MovementType..csv"), row.names = FALSE)
+
+# Plot
+p <- bar_plotter(dat, xvar = "Shipment Size", yvar = "Shipments", fill = "Movement Type", position = "dodge", xrotate = TRUE, coord_flip = TRUE)
+p
+```
+
+Chart Column 3 {.tabset data-width=283}
+--------------------------------------------
+
+### Commodity and Movement Type
+
+```{r Chart_Shipments_By_Commodity_And_Movement_Type_Annual}
+# Organize
+dat <- AnnualShipments[, .(Shipments = sum(NumShipments)),
+                       by = .(SCTG, `Movement Type` = Movement.Type)][order(SCTG, `Movement Type`)]
+dat[SCTGCodes, Commodity := i.Label, on = "SCTG"]
+setcolorder(dat, neworder = c("SCTG", "Commodity", "Movement Type", "Shipments"))
+sorted.levels <- dat[, .(Shipments = sum(Shipments)), by = Commodity][, sort_levels(Commodity, weight = Shipments)]
+dat[, Commodity := factor(Commodity, levels = sorted.levels)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Shipments_by_Commodity_and_MovementType.csv"), row.names = FALSE)
+
+# Plot
+p <- bar_plotter(dat, xvar = "Commodity", yvar = "Shipments", fill = "Movement Type", xrotate = TRUE, coord_flip = TRUE)
+p
+```
+
+### Commodity and Production/Consumption
+
+```{r Chart_Shipments_By_Commodity_And_ProCon_Annual}
+# Organize
+dat <- AnnualShipments[, .(Shipments = sum(NumShipments)), by = .(SCTG, Movement.Type)][order(SCTG, Movement.Type)]
+dat[Movement.Type %in% c("II", "XI", "IM"), ProCon := "Consume"]
+dat[Movement.Type %in% c("IX", "EX"), ProCon := "Produce"]
+dat <- rbind(dat, dat[Movement.Type == "II", .(SCTG, Movement.Type, Shipments, ProCon = "Produce")])
+dat <- dat[, .(Shipments = sum(Shipments)), by = .(SCTG, ProCon)]
+dat[SCTGCodes, Commodity := i.Label, on = "SCTG"]
+setcolorder(dat, neworder = c("SCTG", "Commodity", "ProCon", "Shipments"))
+sorted.levels <- dat[, .(Shipments = sum(Shipments)), by = Commodity][, sort_levels(Commodity, weight = Shipments)]
+dat[, Commodity := factor(Commodity, levels = sorted.levels)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Shipments_by_Commodity_and_ProductionConsumption.csv"), row.names = FALSE)
+
+# Plot
+p <- bar_plotter(dat, xvar = "Commodity", yvar = "Shipments", fill = "ProCon", xrotate = TRUE, coord_flip = TRUE, legend_label = FALSE)
+p
+```
+
+> Note: Internal-to-Internal shipments are counted as both production and consumption for the model region.
+
+Tonnage {data-navmenu="Annual Shipments"}
+============================================
+
+Highlights {data-width=150}
+--------------------------------------------
+
+### Annual Tonnage
+
+```{r Annual_Tonnage_ValueBox}
+value <- format(AnnualShipments[, sum(ShipmentWeight*NumShipments)/2000], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Annual Tonnage", icon = "fa-cube")
+```
+
+### Annual Tonnage (II)
+
+```{r Annual_II_Tonnage_ValueBox}
+value <- format(AnnualShipments[Movement.Type == "II", sum(ShipmentWeight*NumShipments)/2000], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Internal-to-Internal (II)", icon = "fa-arrows")
+```
+
+### Annual Tonnage (IX)
+
+```{r Annual_IX_Tonnage_ValueBox}
+value <- format(AnnualShipments[Movement.Type == "IX", sum(ShipmentWeight*NumShipments)/2000], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Internal-to-External (IX)", icon = "fa-arrow-up")
+```
+
+### Annual Tonnage (XI)
+
+```{r Annual_XI_Tonnage_ValueBox}
+value <- format(AnnualShipments[Movement.Type == "XI", sum(ShipmentWeight*NumShipments)/2000], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "External-to-Internal (XI)", icon = "fa-arrow-down")
+```
+
+### Annual Tonnage (Exports)
+
+```{r Annual_EX_Tonnage_ValueBox}
+value <- format(AnnualShipments[Movement.Type == "EX", sum(ShipmentWeight*NumShipments)/2000], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Exports (EX)", icon = "fa-arrow-up")
+```
+
+### Annual Tonnage (Imports)
+
+```{r Annual_IM_Tonnage_ValueBox}
+value <- format(AnnualShipments[Movement.Type == "IM", sum(ShipmentWeight*NumShipments)/2000], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Imports (IM)", icon = "fa-arrow-down")
+```
+
+Chart Column 1 {data-width=283}
+--------------------------------------------
+
+### Movement Type and Mode
+
+```{r Chart_Tonnage_By_MovementType_And_Mode_Annual}
+# Organize
+dat <- AnnualShipments[, .(Tonnage = sum(ShipmentWeight*NumShipments)/2000),
+                       by = .(Mode, `Movement Type` = Movement.Type)][order(Mode, `Movement Type`)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Tonnage_by_MovementType_and_Mode.csv"), row.names = FALSE)
+
+# Plot
+p <- bar_plotter(dat, xvar = "Movement Type", yvar = "Tonnage", fill = "Mode")
+p
+```
+
+> Note: "Mode" refers to the mode of the long distance movement.
+
+### Movement Type and Production/Consumption
+
+```{r Chart_Tonnage_By_MovementType_And_ProCon_Annual}
+# Organize
+dat <- AnnualShipments[, .(Tonnage = sum(ShipmentWeight*NumShipments)/2000), by = .(`Movement Type` = Movement.Type)]
+dat[`Movement Type` %in% c("II", "XI", "IM"), ProCon := "Consume"]
+dat[`Movement Type` %in% c("IX", "EX"), ProCon := "Produce"]
+dat <- rbind(dat, dat[`Movement Type` == "II", .(`Movement Type`, Tonnage, ProCon = "Produce")])
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Tonnage_by_MovementType_and_ProductionConsumption.csv"), row.names = FALSE)
+
+# Plot
+p <- bar_plotter(dat, xvar = "Movement Type", yvar = "Tonnage", fill = "ProCon")
+p
+```
+
+> Note: Internal-to-Internal tonnage is counted as both production and consumption for the model region.
+
+Chart Column 2 {data-width=283}
+--------------------------------------------
+
+### Shipment Size
+
+```{r Chart_Tonnage_By_ShipmentSize_Annual}
+# Organize
+dat <- AnnualShipments[, .(Tonnage = sum(ShipmentWeight*NumShipments)/2000),
+                       by = .(`Shipment Size` = ShipmentSize)][order(`Shipment Size`)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Tonnage_by_ShipmentSize.csv"), row.names = FALSE)
+
+# Plot
+p <- bar_plotter(dat, xvar = "Shipment Size", yvar = "Tonnage", xrotate = TRUE, coord_flip = TRUE)
+p
+```
+
+### Shipment Size by Movement Type
+
+```{r Chart_Tonnage_By_ShipmentSize_And_Movement_Type_Annual}
+# Organize
+dat <- AnnualShipments[, .(Tonnage = sum(ShipmentWeight*NumShipments)/2000),
+                       by = .(`Shipment Size` = ShipmentSize, `Movement Type` = Movement.Type)][order(`Shipment Size`, `Movement Type`)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Tonnage_by_ShipmentSize_and_MovementType.csv"), row.names = FALSE)
+
+# Plot
+p <- bar_plotter(dat, xvar = "Shipment Size", yvar = "Tonnage", fill = "Movement Type", position = "dodge", xrotate = TRUE, coord_flip = TRUE)
+p
+```
+
+Chart Column 3 {.tabset data-width=283}
+--------------------------------------------
+
+### Commodity and Movement Type
+
+```{r Chart_Tonnage_By_Commodity_And_Movement_Type_Annual}
+# Organize
+dat <- AnnualShipments[, .(Tonnage = sum(ShipmentWeight*NumShipments)/2000),
+                       by = .(SCTG, `Movement Type` = Movement.Type)][order(SCTG, `Movement Type`)]
+dat[SCTGCodes, Commodity := i.Label, on = "SCTG"]
+setcolorder(dat, neworder = c("SCTG", "Commodity", "Movement Type", "Tonnage"))
+sorted.levels <- dat[, .(Tonnage = sum(Tonnage)), by = Commodity][, sort_levels(Commodity, weight = Tonnage)]
+dat[, Commodity := factor(Commodity, levels = sorted.levels)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Tonnage_by_Commodity_and_MovementType.csv"), row.names = FALSE)
+
+# Plot
+p <- bar_plotter(dat, xvar = "Commodity", yvar = "Tonnage", fill = "Movement Type", xrotate = TRUE, coord_flip = TRUE)
+p
+```
+
+### Commodity and Production/Consumption
+
+```{r Chart_Tonnage_By_Commodity_And_ProCon_Annual}
+# Organize
+dat <- AnnualShipments[, .(Tonnage = sum(ShipmentWeight*NumShipments)/2000), by = .(SCTG, Movement.Type)][order(SCTG, Movement.Type)]
+dat[Movement.Type %in% c("II", "XI", "IM"), ProCon := "Consume"]
+dat[Movement.Type %in% c("IX","EX"), ProCon := "Produce"]
+dat <- rbind(dat, dat[Movement.Type == "II", .(SCTG, Movement.Type, Tonnage, ProCon = "Produce")])
+dat <- dat[, .(Tonnage = sum(Tonnage)), by = .(SCTG, ProCon)]
+dat[SCTGCodes, Commodity := i.Label, on = "SCTG"]
+setcolorder(dat, neworder = c("SCTG", "Commodity", "ProCon", "Tonnage"))
+sorted.levels <- dat[, .(Tonnage = sum(Tonnage)), by = Commodity][, sort_levels(Commodity, weight = Tonnage)]
+dat[, Commodity := factor(Commodity, levels = sorted.levels)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Tonnage_by_Commodity_and_ProductionConsumption.csv"), row.names = FALSE)
+
+# Plot
+p <- bar_plotter(dat, xvar = "Commodity", yvar = "Tonnage", fill = "ProCon", xrotate = TRUE, coord_flip = TRUE, legend_label = FALSE)
+p
+```
+
+> Note: Internal-to-Internal tonnage is counted as both production and consumption for the model region.
+
+
+
+Shipments {data-navmenu="Daily Shipments"}
+============================================
+
+Highlights {data-width=150}
+--------------------------------------------
+
+### Daily Shipments
+
+```{r Daily_Shipments_ValueBox}
+value <- format(DailyShipments[, sum(NumShipments)], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Daily Shipments", icon = "fa-cube")
+```
+
+### Daily Shipments (II)
+
+```{r Daily_II_Shipments_ValueBox}
+value <- format(DailyShipments[Movement.Type == "II", sum(NumShipments)], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Internal-to-Internal (II)", icon = "fa-arrows")
+```
+
+### Daily Shipments (IX)
+
+```{r Daily_IX_Shipments_ValueBox}
+value <- format(DailyShipments[Movement.Type == "IX", sum(NumShipments)], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Internal-to-External (IX)", icon = "fa-arrow-up")
+```
+
+### Daily Shipments (XI)
+
+```{r Daily_XI_Shipments_ValueBox}
+value <- format(DailyShipments[Movement.Type == "XI", sum(NumShipments)], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "External-to-Internal (XI)", icon = "fa-arrow-down")
+```
+
+### Daily Shipments (XX)
+
+```{r Daily_XX_Shipments_ValueBox}
+value <- format(DailyShipments[Movement.Type == "XX", sum(NumShipments)], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "External-to-External (XX)", icon = "fa-arrows")
+```
+
+### Daily Shipments (Domestic)
+
+```{r Daily_Dom_Shipments_ValueBox}
+value <- format(DailyShipments[Trade.Type == "Domestic", sum(NumShipments)], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Domestic", icon = "fa-arrows")
+```
+
+### Daily Shipments (Export)
+
+```{r Daily_EX_Shipments_ValueBox}
+value <- format(DailyShipments[Trade.Type == "Export", sum(NumShipments)], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Exports (EX)", icon = "fa-arrow-up")
+```
+
+### Daily Shipments (Import)
+
+```{r Daily_IM_Shipments_ValueBox}
+value <- format(DailyShipments[Trade.Type == "Import", sum(NumShipments)], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Imports", icon = "fa-arrow-down")
+```
+
+
+Chart Column 1 {data-width=283}
+--------------------------------------------
+
+### Movement Type and Mode
+
+```{r Chart_Shipments_By_MovementType_And_Mode}
+# Organize
+dat <- DailyShipments[, .(Shipments = sum(NumShipments)),
+                       by = .(Mode, `Movement Type` = Movement.Type)][order(Mode, `Movement Type`)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Shipments_by_MovementType_and_Mode_Daily.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "Movement Type", yvar = "Shipments", fill = "Mode")
+```
+
+> Note: "Mode" refers to the mode or the combinations of modes of the full shipment route.
+
+
+### Movement Type and Production/Consumption
+
+```{r Chart_Shipments_By_MovementType_And_ProCon}
+# Organize
+dat <- DailyShipments[, .(Shipments = sum(NumShipments)), by = .(`Movement Type` = Movement.Type)]
+dat[`Movement Type` %in% c("II", "XI"), ProCon := "Consume"]
+dat[`Movement Type` %in% c("IX"), ProCon := "Produce"]
+dat[`Movement Type` %in% c("XX"), ProCon := "Transfer"]
+dat <- rbind(dat, dat[`Movement Type` == "II", .(`Movement Type`, Shipments, ProCon = "Produce")])
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Shipments_by_MovementType_and_ProductionConsumption_Daily.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "Movement Type", yvar = "Shipments", fill = "ProCon")
+```
+
+> Note: Internal-to-Internal shipments are counted as both production and consumption for the model region.
+
+Chart Column 2 {data-width=283}
+--------------------------------------------
+
+### Shipment Size
+
+```{r Chart_Shipments_By_ShipmentSize}
+# Organize
+dat <- DailyShipments[, .(Shipments = sum(NumShipments)),
+                       by = .(`Shipment Size` = ShipmentSize)][order(`Shipment Size`)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Shipments_by_ShipmentSize_Daily.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "Shipment Size", yvar = "Shipments", xrotate = TRUE, coord_flip = TRUE)
+```
+
+### Shipment Size by Movement Type
+
+```{r Chart_Shipments_By_ShipmentSize_And_Movement_Type}
+# Organize
+dat <- DailyShipments[, .(Shipments = sum(NumShipments)),
+                       by = .(`Shipment Size` = ShipmentSize, `Movement Type` = Movement.Type)][order(`Shipment Size`, `Movement Type`)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Shipments_by_ShipmentSize_and_MovementType_Daily.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "Shipment Size", yvar = "Shipments", fill = "Movement Type", position = "dodge", xrotate = TRUE, coord_flip = TRUE)
+```
+
+
+Chart Column 3 {.tabset data-width=283}
+--------------------------------------------
+
+### Commodity and Movement Type
+
+```{r Chart_Shipments_By_Commodity_And_Movement_Type}
+# Organize
+dat <- DailyShipments[, .(Shipments = sum(NumShipments)),
+                       by = .(SCTG, `Movement Type` = Movement.Type)][order(SCTG, `Movement Type`)]
+dat[SCTGCodes, Commodity := i.Label, on = "SCTG"]
+setcolorder(dat, neworder = c("SCTG", "Commodity", "Movement Type", "Shipments"))
+sorted.levels <- dat[, .(Shipments = sum(Shipments)), by = Commodity][, sort_levels(Commodity, weight = Shipments)]
+dat[, Commodity := factor(Commodity, levels = sorted.levels)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Shipments_by_Commodity_and_MovementType_Daily.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "Commodity", yvar = "Shipments", fill = "Movement Type", xrotate = TRUE, coord_flip = TRUE)
+```
+
+### Commodity and Production/Consumption
+
+```{r Chart_Shipments_By_Commodity_And_ProCon}
+# Organize
+dat <- DailyShipments[, .(Shipments = sum(NumShipments)), by = .(SCTG, Movement.Type)][order(SCTG, Movement.Type)]
+dat[Movement.Type %in% c("II", "XI"), ProCon := "Consume"]
+dat[Movement.Type %in% c("IX"), ProCon := "Produce"]
+dat[Movement.Type %in% c("XX"), ProCon := "Transfer"]
+dat <- rbind(dat, dat[Movement.Type == "II", .(SCTG, Movement.Type, Shipments, ProCon = "Produce")])
+dat <- dat[, .(Shipments = sum(Shipments)), by = .(SCTG, ProCon)]
+dat[SCTGCodes, Commodity := i.Label, on = "SCTG"]
+setcolorder(dat, neworder = c("SCTG", "Commodity", "ProCon", "Shipments"))
+sorted.levels <- dat[, .(Shipments = sum(Shipments)), by = Commodity][, sort_levels(Commodity, weight = Shipments)]
+dat[, Commodity := factor(Commodity, levels = sorted.levels)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Shipments_by_Commodity_and_ProductionConsumption_Daily.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "Commodity", yvar = "Shipments", fill = "ProCon", xrotate = TRUE, coord_flip = TRUE, legend_label = FALSE)
+```
+
+> Note: Internal-to-Internal shipments are counted as both production and consumption for the model region.
+
+### Shipments by Origin County
+
+```{r Chart_Shipments_By_Origin_County}
+# Organize
+dat <- DailyShipments[County.Origin != "External", .(Shipments = sum(NumShipments)),
+                       by = .(County = County.Origin, Movement.Type)][order(County)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Shipments_by_Origin_County_Daily.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "County", yvar = "Shipments", xlabel = "Origin County", fill = "Movement.Type", coord_flip = TRUE)
+```
+
+### Shipments by Destination County
+
+```{r Chart_Shipments_By_Destination_County}
+# Organize
+dat <- DailyShipments[County.Destination != "External", .(Shipments = sum(NumShipments)),
+                       by = .(County = County.Destination, Movement.Type)][order(County)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Shipments_by_Destination_County_Daily.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "County", yvar = "Shipments", xlabel = "Destination County", fill = "Movement.Type", coord_flip = TRUE)
+```
+
+
+Tonnage {data-navmenu="Daily Shipments"}
+============================================
+
+Highlights {data-width=150}
+--------------------------------------------
+
+### Daily Tonnage
+
+```{r Daily_Tonnage_ValueBox}
+value <- format(DailyShipments[, sum(ShipmentWeight*NumShipments)/2000], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Daily Tonnage", icon = "fa-cube")
+```
+
+### Daily Tonnage (II)
+
+```{r Daily_II_Tonnage_ValueBox}
+value <- format(DailyShipments[Movement.Type == "II", sum(ShipmentWeight*NumShipments)/2000], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Internal-to-Internal (II)", icon = "fa-arrows")
+```
+
+### Daily Tonnage (IX)
+
+```{r Daily_IX_Tonnage_ValueBox}
+value <- format(DailyShipments[Movement.Type == "IX", sum(ShipmentWeight*NumShipments)/2000], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Internal-to-External (IX)", icon = "fa-arrow-up")
+```
+
+### Daily Tonnage (XI)
+
+```{r Daily_XI_Tonnage_ValueBox}
+value <- format(DailyShipments[Movement.Type == "XI", sum(ShipmentWeight*NumShipments)/2000], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "External-to-Internal (XI)", icon = "fa-arrow-down")
+```
+
+### Daily Tonnage (XX)
+
+```{r Daily_XX_Tonnage_ValueBox}
+value <- format(DailyShipments[Movement.Type == "XX", sum(ShipmentWeight*NumShipments)/2000], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "External-to-External (XX)", icon = "fa-arrows")
+```
+
+### Daily Tonnage (Domestic)
+
+```{r Daily_Dom_Tonnage_ValueBox}
+value <- format(DailyShipments[Trade.Type == "Domestic", sum(ShipmentWeight*NumShipments)/2000], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Domestic", icon = "fa-arrows")
+```
+
+### Daily Tonnage (Exports)
+
+```{r Daily_EX_Tonnage_ValueBox}
+value <- format(DailyShipments[Trade.Type == "Export", sum(ShipmentWeight*NumShipments)/2000], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Exports", icon = "fa-arrow-up")
+```
+
+### Daily Tonnage (Imports)
+
+```{r Daily_IM_Tonnage_ValueBox}
+value <- format(DailyShipments[Trade.Type == "Import", sum(ShipmentWeight*NumShipments)/2000], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Imports", icon = "fa-arrow-down")
+```
+
+
+Chart Column 1 {data-width=283}
+--------------------------------------------
+
+### Movement Type and Mode
+
+```{r Chart_Tonnage_By_MovementType_And_Mode}
+# Organize
+dat <- DailyShipments[, .(Tonnage = sum(ShipmentWeight*NumShipments)/2000),
+                       by = .(Mode, `Movement Type` = Movement.Type)][order(Mode, `Movement Type`)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Tonnage_by_MovementType_and_Mode_Daily.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "Movement Type", yvar = "Tonnage", fill = "Mode")
+```
+
+> Note: "Mode" refers to the mode or the combinations of modes of the full shipment route.
+
+
+### Movement Type and Production/Consumption
+
+```{r Chart_Tonnage_By_MovementType_And_ProCon}
+# Organize
+dat <- DailyShipments[, .(Tonnage = sum(ShipmentWeight*NumShipments)/2000), by = .(`Movement Type` = Movement.Type)]
+dat[`Movement Type` %in% c("II", "XI"), ProCon := "Consume"]
+dat[`Movement Type` %in% c("IX"), ProCon := "Produce"]
+dat[`Movement Type` %in% c("XX"), ProCon := "Transfer"]
+dat <- rbind(dat, dat[`Movement Type` == "II", .(`Movement Type`, Tonnage, ProCon = "Produce")])
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Tonnage_by_MovementType_and_ProductionConsumption_Daily.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "Movement Type", yvar = "Tonnage", fill = "ProCon")
+```
+
+> Note: Internal-to-Internal tonnage is counted as both production and consumption for the model region.
+
+
+Chart Column 2 {data-width=283}
+--------------------------------------------
+
+### Shipment Size
+
+```{r Chart_Tonnage_By_ShipmentSize}
+# Organize
+dat <- DailyShipments[, .(Tonnage = sum(ShipmentWeight*NumShipments)/2000),
+                       by = .(`Shipment Size` = ShipmentSize)][order(`Shipment Size`)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Tonnage_by_ShipmentSize_Daily.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "Shipment Size", yvar = "Tonnage", xrotate = TRUE, coord_flip = TRUE)
+```
+
+### Shipment Size by Movement Type
+
+```{r Chart_Tonnage_By_ShipmentSize_And_Movement_Type}
+# Organize
+dat <- DailyShipments[, .(Tonnage = sum(ShipmentWeight*NumShipments)/2000),
+                       by = .(`Shipment Size` = ShipmentSize, `Movement Type` = Movement.Type)][order(`Shipment Size`, `Movement Type`)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Tonnage_by_ShipmentSize_and_MovementType_Daily.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "Shipment Size", yvar = "Tonnage", fill = "Movement Type", position = "dodge", xrotate = TRUE, coord_flip = TRUE)
+```
+
+
+Chart Column 3 {.tabset data-width=283}
+--------------------------------------------
+
+### Commodity and Movement Type
+
+```{r Chart_Tonnage_By_Commodity_And_Movement_Type}
+# Organize
+dat <- DailyShipments[, .(Tonnage = sum(ShipmentWeight*NumShipments)/2000),
+                       by = .(SCTG, `Movement Type` = Movement.Type)][order(SCTG, `Movement Type`)]
+dat[SCTGCodes, Commodity := i.Label, on = "SCTG"]
+setcolorder(dat, neworder = c("SCTG", "Commodity", "Movement Type", "Tonnage"))
+sorted.levels <- dat[, .(Tonnage = sum(Tonnage)), by = Commodity][, sort_levels(Commodity, weight = Tonnage)]
+dat[, Commodity := factor(Commodity, levels = sorted.levels)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Tonnage_by_Commodity_and_MovementType_Daily.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "Commodity", yvar = "Tonnage", fill = "Movement Type", xrotate = TRUE, coord_flip = TRUE)
+```
+
+### Commodity and Production/Consumption
+
+```{r Chart_Tonnage_By_Commodity_And_ProCon}
+# Organize
+dat <- DailyShipments[, .(Tonnage = sum(ShipmentWeight*NumShipments)/2000), by = .(SCTG, Movement.Type)][order(SCTG, Movement.Type)]
+dat[Movement.Type %in% c("II", "XI"), ProCon := "Consume"]
+dat[Movement.Type %in% c("IX"), ProCon := "Produce"]
+dat[Movement.Type %in% c("XX"), ProCon := "Transfer"]
+dat <- rbind(dat, dat[Movement.Type == "II", .(SCTG, Movement.Type, Tonnage, ProCon = "Produce")])
+dat <- dat[, .(Tonnage = sum(Tonnage)), by = .(SCTG, ProCon)]
+dat[SCTGCodes, Commodity := i.Label, on = "SCTG"]
+setcolorder(dat, neworder = c("SCTG", "Commodity", "ProCon", "Tonnage"))
+sorted.levels <- dat[, .(Tonnage = sum(Tonnage)), by = Commodity][, sort_levels(Commodity, weight = Tonnage)]
+dat[, Commodity := factor(Commodity, levels = sorted.levels)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Tonnage_by_Commodity_and_ProductionConsumption_Daily.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "Commodity", yvar = "Tonnage", fill = "ProCon", xrotate = TRUE, coord_flip = TRUE, legend_label = FALSE)
+```
+
+> Note: Internal-to-Internal tonnage is counted as both production and consumption for the model region.
+
+### Tonnage by Origin County
+
+```{r Chart_Tonnage_By_Origin_County}
+# Organize
+dat <- DailyShipments[County.Origin != "External", .(Tonnage = sum(ShipmentWeight*NumShipments)/2000),
+                       by = .(County = County.Origin, Movement.Type)][order(County)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Tonnage_by_Origin_County_Daily.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "County", yvar = "Tonnage", xlabel = "Origin County", fill = "Movement.Type", coord_flip = TRUE)
+```
+
+### Tonnage by Destination County
+
+```{r Chart_Tonnage_By_Destination_County}
+# Organize
+dat <- DailyShipments[County.Destination != "External", .(Tonnage = sum(ShipmentWeight*NumShipments)/2000),
+                       by = .(County = County.Destination, Movement.Type)][order(County)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Tonnage_by_Destination_County_Daily.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "County", yvar = "Tonnage", xlabel = "Destination County", fill = "Movement.Type", coord_flip = TRUE)
+```
+
+<!-- Tables {data-navmenu="Freight Truck Tours"} -->
+<!-- ============================================ -->
+
+<!-- Table Column 1 {.tabset .tabset-fade} -->
+<!-- -------------------------------------------- -->
+
+<!-- ### External Station Truck Counts -->
+
+<!-- ```{r Table_Freight_Truck_ExternalStation_Counts} -->
+
+<!-- # Organize -->
+<!-- dat <- ft_trips[Movement.Type != "II", .(Count = .N), by = .(ExternalStation, `Movement Type` = Movement.Type, Vehicle)][order(ExternalStation, `Movement Type`, Vehicle)] -->
+
+<!-- # Save -->
+<!-- write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Freight_Truck_Counts_ExternalStations.csv"), row.names = FALSE) -->
+
+<!-- # Plot -->
+<!-- datatable(dat) -->
+
+<!-- ``` -->
+
+Charts {data-navmenu="Freight Truck Tours"}
+============================================
+
+Highlights {data-width=150}
+--------------------------------------------
+
+### Freight Truck Tours
+
+```{r Freight_Truck_Tours_ValueBox2}
+FreightTruckTours.ValueBox
+```
+
+### Freight Truck Peddling Tours
+
+```{r Freight_Truck_Peddling_Tours}
+value <- format(ft_trips[Peddled == 1L, uniqueN(TourID)], big.mark = ",", trim = TRUE)
+valueBox(value, caption = "Peddling Tours", icon = "fa-truck")
+```
+
+### Total Stops
+
+```{r Freight_Truck_Total_Stops_ValueBox}
+value <- format(ft_trips[Activity != "Return", .N], big.mark = ",", trim = TRUE)
+valueBox(value, "Total Stops", icon = "fa-map-marker", color = "success")
+```
+
+### Intermediate Stops
+
+```{r Freight_Truck_Intermediate_Stops_ValueBox}
+value <- format(ft_trips[Scheduled == 0L, .N], big.mark = ",", trim = TRUE)
+valueBox(value, "Intermediate Stops", icon = "fa-cutlery")
+```
+
+Chart Column 1 {.tabset data-width=283}
+--------------------------------------------
+
+### Freight Truck Trip Orgins by County
+
+```{r Chart_Freight_Trips_Origins_by_County}
+# Organize
+dat <- ft_trips[, .(County = County.Origin, Vehicle)]
+dat[, County := factor(County, levels = sort_levels(County))]
+dat <- dat[,.N, by = .(County, Vehicle)][order(County)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Freight_Trip_Origins_by_County.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "County", yvar = "N", fill = "Vehicle", xlabel = "Trip Origin County", ylabel = "Freight Truck Trips", coord_flip = TRUE)
+```
+
+### Freight Truck Trips Destinations by County
+
+```{r Chart_Freight_Trips_Destinations_by_County}
+# Organize
+dat <- ft_trips[, .(County = County.Destination, Vehicle)]
+dat[, County := factor(County, levels = sort_levels(County))]
+dat <- dat[,.N, by = .(County, Vehicle)][order(County)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Freight_Trip_Destinations_by_County.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "County", yvar = "N", fill = "Vehicle", xlabel = "Trip Destination County", ylabel = "Freight Truck Trips", coord_flip = TRUE)
+```
+
+### Freight Truck Trip Anchor Locations by County
+
+```{r Chart_Freight_Trips_Anchors_by_County}
+# Organize
+dat <- ft_trips[, .(County = County.Anchor, Vehicle)]
+dat[, County := factor(County, levels = sort_levels(County))]
+dat <- dat[,.N, by = .(County, Vehicle)][order(County)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Freight_Trip_Anchors_by_County.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "County", yvar = "N", fill = "Vehicle", xlabel = "Trip Anchor County", ylabel = "Freight Truck Trips", coord_flip = TRUE)
+```
+
+### Freight Truck Stop Activities by County
+
+```{r Chart_Freight_Stop_Activity_by_County}
+# Organize
+dat <- ft_trips[, .(County = County.Destination, Activity)]
+dat[, County := factor(County, levels = sort_levels(County))]
+dat <- dat[,.N, by = .(County, Activity)][order(County)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Freight_Stop_Acitivity_by_County.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "County", yvar = "N", fill = "Activity", xlabel = "Stop Location County", ylabel = "Freight Truck Stops", coord_flip = TRUE)
+```
+
+### Freight Truck Tour Average Stops by Anchor County
+
+```{r Chart_Freight_Average_Stops_Tour_by_County}
+# Organize
+dat <- merge(ft_trips[,.(Stops = .N) , by = .(County = County.Anchor, Activity)],
+             ft_trips[,.(Tours = length(unique(TourID))), by = .(County = County.Anchor)],
+             by = "County")
+dat[, StopsPerTour := Stops/Tours]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Freight_Trips_Tours_by_County.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "County", yvar = "StopsPerTour", fill = "Activity", xlabel = "Tour Anchor County", ylabel = "Freight Truck Stops per Tour", coord_flip = TRUE)
+```
+
+Chart Column 2 {data-width=283}
+--------------------------------------------
+
+### Freight Truck Trip Activities by Vehicle
+
+```{r Chart_Freight_Trips_Activity_by_Vehicle}
+# Organize
+dat <- ft_trips[, .(Activity, Vehicle)][order(Activity, Vehicle)]
+dat[, Activity := factor(Activity, levels = sort_levels(Activity))]
+dat <- dat[,.N, by = .(Activity, Vehicle)][order(Activity)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Freight_Trip_Activity_by_Vehicle.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "Activity", yvar = "N", fill = "Vehicle", xlabel = "Trip Activity", ylabel = "Freight Truck Trips", coord_flip = TRUE)
+```
+
+### Freight Truck Pick up and Delivery Weights by County and Activity
+
+```{r Chart_Freight_Pickup_Delivery_Weight_by_County_Activity}
+# Organize
+dat <- ft_trips[!is.na(ShipmentWeight),.(Weight = sum(ShipmentWeight)/2000) , by = .(County = County.Destination, Activity)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Freight_Pickup_Delivery_Weight_by_County_Activity.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "County", yvar = "Weight", fill = "Activity", xlabel = "Stop County", ylabel = "Freight Truck Pickup/Delivery Weight (Tons)", coord_flip = TRUE)
+```
+
+### Freight Truck Pick up and Delivery Weights by County and Vehicle
+
+```{r Chart_Freight_Pickup_Delivery_Weight_by_County_Vehicle}
+# Organize
+dat <- ft_trips[!is.na(ShipmentWeight),.(Weight = sum(ShipmentWeight)/2000) , by = .(County = County.Destination, Vehicle)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Freight_Pickup_Delivery_Weight_by_County_Vehicle.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "County", yvar = "Weight", fill = "Vehicle", xlabel = "Stop County", ylabel = "Freight Truck Pickup/Delivery Weight (Tons)", coord_flip = TRUE)
+```
+
+Densities {data-navmenu="Freight Truck Tours"}
+============================================
+
+Density Column 1
+--------------------------------------------
+
+### First Stop Arrival Time by Vehicle
+
+```{r Density_Freight_Arrival_Time_By_Vehicle}
+# Organize
+dat <- ft_trips[TripID == 1L, .(`Arrival Time` = as.numeric(MAMArrive), Vehicle)]
+
+# Save
+
+# Plot
+breaks <- seq(from = 0, to = 1439, 60)
+p <- ggplot(dat, aes(x = `Arrival Time`, fill = Vehicle)) +
+  geom_density(alpha = 0.25) + ylab("Density") +
+  scale_x_continuous(breaks = breaks, labels = labelMAM(breaks)) +
+  theme_db + theme(axis.text = element_text(angle = 90, hjust = 1))
+ggplotly(p)
+```
+
+### First Stop Arrival Time by Activity
+
+```{r Density_Freight_Arrival_Time_By_Activity}
+# Organize
+ft_trips[Scheduled == 1L, MinTripID := min(TripID), by = .(Vehicle, TourID)]
+dat <- ft_trips[TripID == MinTripID, .(`Arrival Time` = as.numeric(MAMArrive), Activity)]
+
+# Save
+
+# Plot
+breaks <- seq(from = 0, to = 1439, 60)
+p <- ggplot(dat, aes(x = `Arrival Time`, fill = Activity)) +
+  geom_density(alpha = 0.25) + ylab("Density") +
+  scale_x_continuous(breaks = breaks, labels = labelMAM(breaks)) +
+  theme_db + theme(axis.text = element_text(angle = 90, hjust = 1))
+ggplotly(p)
+```
+
+Density Column 2 {.tabset .tabset-fade}
+--------------------------------------------
+
+### Tour Length by Vehicle
+
+```{r Density_Freight_Tour_Length_By_Vehicle}
+# Organize
+dat <- ft_trips[, .(`Tour Length (miles)` = sum(Distance)), by = .(Vehicle, TourID)]
+
+# Save
+
+# Plot
+alpha <- 0.95
+x.limits <- c(0, quantile(dat$`Tour Length (miles)`, alpha))
+p <- ggplot(dat, aes(x = `Tour Length (miles)`, fill = Vehicle)) +
+  geom_density(alpha = 0.25) + ylab("Density") + xlim(x.limits) +
+  theme_db
+
+ggplotly(p)
+```
+
+> Note: `r percent(1 - alpha)` of trips are longer than `r round(x.limits[2])` miles and are not displayed.
+
+### Trip Length by Vehicle
+
+```{r Density_Freight_Trip_Length_By_Vehicle}
+# Organize
+dat <- ft_trips[, .(Vehicle, `Trip Length (miles)` = Distance)]
+
+# Save
+
+# Plot
+alpha <- 0.95
+x.limits <- c(0, quantile(dat$`Trip Length (miles)`, alpha))
+p <- ggplot(dat, aes(x = `Trip Length (miles)`, fill = Vehicle)) +
+  geom_density(alpha = 0.25) + ylab("Density") + xlim(x.limits) +
+  theme_db
+ggplotly(p)
+```
+
+> Note: `r percent(1 - alpha)` of trips are longer than `r round(x.limits[2])` miles and are not displayed.
+
+### Tour Duration by Vehicle
+
+```{r Density_Freight_Tour_Duration_By_Vehicle}
+# Organize
+dat <- ft_trips[, .(`Tour Duration (mins)` = sum(TravelTime + StopDuration)),
+                by = .(Vehicle, TourID)]
+
+# Save
+
+# Plot
+alpha <- 0.95
+x.limits <- c(0, quantile(dat$`Tour Duration (mins)`, alpha))
+p <- ggplot(dat, aes(x = `Tour Duration (mins)`, fill = Vehicle)) +
+  geom_density(alpha = 0.25) + ylab("Density") + xlim(x.limits) +
+  theme_db
+
+ggplotly(p)
+```
+
+> Note: `r percent(1 - alpha)` of trips are longer than `r round(x.limits[2])` minutes and are not displayed.
+
+### Trip Duration by Vehicle
+
+```{r Density_Freight_Trip_Duration_By_Vehicle}
+# Organize
+dat <- ft_trips[, .(Vehicle, `Trip Duration (mins)` = TravelTime)]
+
+# Save
+
+# Plot
+alpha <- 0.95
+x.limits <- c(0, quantile(dat$`Trip Duration (mins)`, alpha))
+p <- ggplot(dat, aes(x = `Trip Duration (mins)`, fill = Vehicle)) +
+  geom_density(alpha = 0.25) + ylab("Density") + xlim(x.limits) +
+  theme_db
+ggplotly(p)
+```
+
+> Note: `r percent(1 - alpha)` of trips are longer than `r round(x.limits[2])` minutes and are not displayed.
+
+### Stop Duration by Vehicle
+
+```{r Density_Freight_Stop_Duration_By_Vehicle}
+# Organize
+dat <- ft_trips[Activity != "Return",
+                .(Vehicle, `Stop Duration (minutes)` = StopDuration)]
+
+# Save
+
+# Plot
+alpha <- 0.95
+x.limits <- c(0, quantile(dat$`Stop Duration (minutes)`, alpha))
+p <- ggplot(dat, aes(x = `Stop Duration (minutes)`, fill = Vehicle)) +
+  geom_density(alpha = 0.25) + ylab("Density") + xlim(x.limits) +
+  theme_db
+ggplotly(p)
+```
+
+> Note: `r percent(1 - alpha)` of stops are longer than `r round(x.limits[2])` minutes and are not displayed.
+
+### Stop Duration by Activity
+
+```{r Density_Freight_Stop_Duration_By_Activity}
+# Organize
+dat <- ft_trips[Activity != "Return",
+                .(Activity, `Stop Duration (minutes)` = StopDuration)]
+
+# Save
+
+# Plot
+alpha <- 0.95
+x.limits <- c(0, quantile(dat$`Stop Duration (minutes)`, alpha))
+p <- ggplot(dat , aes(x = `Stop Duration (minutes)`, fill = Activity)) +
+  geom_density(alpha = 0.25) + ylab("Density") + xlim(x.limits) +
+  theme_db
+ggplotly(p)
+```
+
+> Note: `r percent(1 - alpha)` of stops are longer than `r round(x.limits[2])` minutes and are not displayed.
+
+Maps {data-navmenu="Freight Truck Tours"}
+============================================
+
+Maps {.tabset .tabset-fade}
+--------------------------------------------
+
+<!-- ### Stops Over Time -->
+
+<!-- ```{r Map_Freight_Stops_Over_Time} -->
+<!-- stops_total <- ft_trips[, TimeBins := as.factor(floor(MAMArrive / 60))] -->
+<!-- stops_total <- stops_total[, .N, by = .(TAZ.Destination, TimeBins)] -->
+<!-- stops_total[, nPts := floor(log(N) / 3)] -->
+<!-- stops_total <- stops_total[nPts > 0] -->
+<!-- map <- leaflet_custom(elementId = "ftstoptime") %>% -->
+<!--   addProviderTiles(map_type, group = "Background Map") %>% -->
+<!--   setView(-77.4618, 38.72869, 8) -->
+<!-- map$dependencies <- c(map$dependencies, list(htmlDependency( -->
+<!--   name = "leaflet-timeline", -->
+<!--   version = "1.0.0", -->
+<!--   src = c("file" = SYSTEM_TEMPLATES_PATH), -->
+<!--   script = "javascripts/leaflet.timeline.js", -->
+<!--   stylesheet = "stylesheets/leaflet.timeline.css" -->
+<!-- ))) -->
+<!-- map_center <- coordinates(shp_outline) -->
+<!-- dimnames(map_center)[[2]] <- c("lon", "lat") -->
+<!-- ghost_df <- data.frame() -->
+<!-- points_df <- data.frame() -->
+<!-- setkey(stops_total, TAZ.Destination) -->
+<!-- for (time_bin in levels(stops_total[["TimeBins"]])) { -->
+<!--   stops_time <- stops_total[TimeBins == time_bin, .(TAZ.Destination, nPts)] -->
+<!--   for (i in seq_len(nrow(stops_time))) { -->
+<!--     points <- NULL -->
+<!--     n <- stops_time[i, nPts] -->
+<!--     if (n < 1) { -->
+<!--       next -->
+<!--     } -->
+<!--     polygon_TAZ <- shp[shp@data$TAZ == stops_time[i, TAZ.Destination], ] -->
+<!--     tryCatch( -->
+<!--       { -->
+<!--         points <- spsample(polygon_TAZ, n = n, type = "random")@coords -->
+<!--       }, -->
+<!--       error = function(e) { -->
+<!--         NULL -->
+<!--       } -->
+<!--     ) -->
+<!--     if (!is.null(points)) { -->
+<!--       dimnames(points)[[2]] <- c("lon", "lat") -->
+<!--       start <- strptime(sprintf("2000-01-01 %02d:00", as.integer(time_bin)), format = "%Y-%m-%d %H:%M") -->
+<!--       end   <- strptime(sprintf("2000-01-01 %02d:59", as.integer(time_bin)), format = "%Y-%m-%d %H:%M") -->
+<!--       points_df <- rbind(points_df, data.frame(points, "start" = start, "end" = end)) -->
+<!--     } -->
+<!--   } -->
+<!--   start <- strptime(sprintf("2000-01-01 %02d:00",  as.integer(time_bin)     ), format = "%Y-%m-%d %H:%M") -->
+<!--   end   <- strptime(sprintf("2000-01-01 %02d:00", (as.integer(time_bin) + 1)), format = "%Y-%m-%d %H:%M") -->
+<!--   ghost_df <- rbind(ghost_df, data.frame(map_center, "start" = start, "end" = end)) -->
+<!-- } -->
+<!-- ghost_json <- geojson_json(ghost_df, lat = "lat", lon = "lon") -->
+<!-- points_json <- geojson_json(points_df, lat = "lat", lon = "lon") -->
+<!-- map %>% -->
+<!--   onRender(sprintf( -->
+<!--     'function(el,x){ -->
+<!--       var slider = L.timelineSliderControl({ -->
+<!--         steps: 48, -->
+<!--         duration: 24000, -->
+<!--         showTicks: true, -->
+<!--         waitToUpdateMap: true, -->
+<!--         formatOutput: function(date){ -->
+<!--           return new Date(date).toLocaleTimeString("en-US", { hour12: false, second: undefined }); -->
+<!--         } -->
+<!--       }); -->
+<!--       HTMLWidgets.find("#ftstoptime").addControl(slider); -->
+<!--       var timeline = L.timeline(%s, { -->
+<!--         pointToLayer: function(data, latlng){ -->
+<!--           return L.circle(latlng, 200, { -->
+<!--             fillOpacity: 1, -->
+<!--             opacity: 1 -->
+<!--           }); -->
+<!--         } -->
+<!--       }); -->
+<!--       timeline.addTo(HTMLWidgets.find("#ftstoptime")); -->
+<!--       var ghostTimeline = L.timeline(%s, { -->
+<!--         pointToLayer: function(data, latlng){ -->
+<!--           return L.circle(latlng, 1, { -->
+<!--             fillOpacity: 0, -->
+<!--             opacity: 0 -->
+<!--           }); -->
+<!--         } -->
+<!--       }); -->
+<!--       ghostTimeline.addTo(HTMLWidgets.find("#ftstoptime")); -->
+<!--       slider.addTimelines(timeline, ghostTimeline); -->
+<!--     }', -->
+<!--     points_json, -->
+<!--     ghost_json -->
+<!--   )) -->
+<!-- ``` -->
+
+<!-- ### Sampled Tours -->
+
+<!-- ```{r Map_Freight_Sample_Tours} -->
+<!-- javascript <- 'function(el, x) { -->
+<!--   var basemaps = {};' -->
+<!-- map <- leaflet_custom(elementId = "ft_sampletours") %>% -->
+<!--   addProviderTiles(map_type, group = "Background Map") %>% -->
+<!--   setView(-77.4618, 38.72869, 8) %>% -->
+<!--   addControl( -->
+<!--     '<div class="leaflet-div-icon-ft-delivery leaflet-div-icon-legend"></div>Delivery<br><div class="leaflet-div-icon-ft-return leaflet-div-icon-legend"></div>Return<br><div class="leaflet-div-icon-ft-pick_up leaflet-div-icon-legend"></div>Pick-Up<br><div class="leaflet-div-icon-ft-break_meal leaflet-div-icon-legend"></div>Break/Meal<br><div class="leaflet-div-icon-ft-transfer leaflet-div-icon-legend"></div>Transfer<br><div class="leaflet-div-icon-ft-other leaflet-div-icon-legend"></div>Other<br><div class="leaflet-div-icon-ft-vehicle_service leaflet-div-icon-legend"></div>Vehicle Service<br>', -->
+<!--     position = "bottomright" -->
+<!--   ) -->
+<!-- map$dependencies <- c(map$dependencies, list(htmlDependency( -->
+<!--   name = "leaflet-polylinedecorator", -->
+<!--   version = "1.1.0", -->
+<!--   src = c("file" = SYSTEM_TEMPLATES_PATH), -->
+<!--   script = "javascripts/leaflet.polylineDecorator.js" -->
+<!-- ))) -->
+<!-- used_bus <- numeric(0) -->
+<!-- for (bus_num in 1:5) { -->
+<!--   i <- 1 -->
+<!--   max <- 5 -->
+<!--   possible_businesses <- Facilities[DistID %in% unique(ft_trips[, TourID, by = DistID])[, .N, by = DistID][N == max, DistID] & !(DistID %in% used_bus), DistID] -->
+<!--   while (TRUE) { -->
+<!--     business <- ft_trips[DistID == possible_businesses[i], ] -->
+<!--     if (nrow(business) > 0) { -->
+<!--       if (length(business[NintStops == 1, TourID]) >= 4) { -->
+<!--         business <- business[TourID %in% unique(business[!TourID %in% business[NintStops == 1, TourID]][, TourID])[1:4]] -->
+<!--         break -->
+<!--       } -->
+<!--     } -->
+<!--     i <- i + 1 -->
+<!--     if (i > length(possible_businesses)) { -->
+<!--       max <- max + 1 -->
+<!--       possible_businesses <- Facilities[DistID %in% unique(ft_trips[, TourID, by = DistID])[, .N, by = DistID][N == max, DistID] & !(DistID %in% used_bus), DistID] -->
+<!--       i <- 1 -->
+<!--     } -->
+<!--   } -->
+<!--   used_bus[bus_num] <- business[1, DistID] -->
+<!--   pal <- colorFactor(palette = "Set1", levels = unique(business$TourID)) -->
+<!--   javascript <- paste0(javascript, sprintf('var lG_%s = L.layerGroup();', bus_num)) -->
+<!--   for (tour in unique(business$TourID)) { -->
+<!--     coords <- coordinates(shp[shp@data$TAZ %in% business[TourID == tour, TAZ.Origin], ]) -->
+<!--     coords <- rbind(coords, coords[1, c(1, 2)]) # This assumes that the tour is a closed walk (beginning and ending vertices are identical) -->
+<!--     coords[ , c(1,2)] <- coords[ , c(2,1)] -->
+<!--     javascript <- paste0(javascript, sprintf( -->
+<!-- 'var pl_%s = L.polyline(%s, {opacity: 1, weight: 3, color: "%s"}); -->
+<!-- lG_%s.addLayer(pl_%s);', -->
+<!--       tour, -->
+<!--       toJSON(coords), -->
+<!--       pal(tour), -->
+<!--       bus_num, -->
+<!--       tour -->
+<!--     )) -->
+<!--     for (i in 1:(nrow(coords) - 1)) { -->
+<!--       javascript <- paste0(javascript, sprintf( -->
+<!-- 'var plDec_%s = L.polylineDecorator(%s, { -->
+<!-- patterns: [{offset: "100%%", repeat: 0, symbol: L.Symbol.arrowHead({pixelSize: 15, pathOptions: {fillOpacity: 1, weight: 0, color: "%s"}})}] -->
+<!-- }); -->
+<!-- lG_%s.addLayer(plDec_%s);', -->
+<!--         paste0(tour, i), -->
+<!--         toJSON(coords[i:(i + 1),c(1,2)]), -->
+<!--         pal(tour), -->
+<!--         bus_num, -->
+<!--         paste0(tour, i) -->
+<!--       )) -->
+<!--     } -->
+<!--   } -->
+<!--   for (activity in unique(business$Activity)) { -->
+<!--     coords <- coordinates(shp[shp@data$TAZ %in% business[Activity == activity, TAZ.Destination], ]) -->
+<!--     coords <- rbind(coords, coords[1, c(1, 2)]) -->
+<!--     coords[ , c(1,2)] <- coords[ , c(2,1)] -->
+<!--     for (i in 1:(nrow(coords) - 1)) { -->
+<!--       javascript <- paste0(javascript, sprintf( -->
+<!-- 'var plDec_%s = L.polylineDecorator(%s, { -->
+<!-- patterns: [{offset: 0, repeat: 0, symbol: L.Symbol.marker({markerOptions: {icon: L.divIcon({className: "leaflet-div-icon-ft-%s"})}})}] -->
+<!-- }); -->
+<!-- lG_%s.addLayer(plDec_%s);', -->
+<!--         paste0(tolower(gsub("[^[:alpha:]]", "_", activity)), i), -->
+<!--         toJSON(coords[i:(i + 1),c(1,2)]), -->
+<!--         tolower(gsub("[^[:alpha:]]", "_", activity)), -->
+<!--         bus_num, -->
+<!--         paste0(tolower(gsub("[^[:alpha:]]", "_", activity)), i) -->
+<!--       )) -->
+<!--     } -->
+<!--   } -->
+<!--   javascript <- paste0(javascript, sprintf( -->
+<!-- 'basemaps["Facility %s"] = lG_%s;', -->
+<!--     bus_num, -->
+<!--     bus_num -->
+<!--   )) -->
+<!-- } -->
+<!-- javascript <- paste0(javascript, sprintf( -->
+<!-- 'lG_%s.addTo(HTMLWidgets.find("#%s")); -->
+<!-- L.control.layers(basemaps, {}).addTo(HTMLWidgets.find("#%s")); -->
+<!-- }', -->
+<!--   1, -->
+<!--   "ft_sampletours", -->
+<!--   "ft_sampletours" -->
+<!-- )) -->
+<!-- map <- onRender(map, javascript) -->
+<!-- map -->
+<!-- ``` -->
+
+<!-- > Note: These are a sampling of peddling-tours from a few distribution centers for illustrative purposes. -->
+
+### Stops by Vehicle Type
+
+```{r Map_Freight_Stops_By_Vehicle}
+k <- 25
+map <- leaflet() %>%
+  addProviderTiles(map_type, group = "Background Map")
+map <- map %>% addTAZPoints(data = ft_trips[!Activity %in% c("Return", "Transfer")],
+                            shp = shp, group = "Vehicle",
+                            scale.factor = k, TAZcol = "TAZ.Destination") %>%
+  addTAZPolygons()
+map
+```
+
+> Note: Each data point represents `r comma(k)` stops and precise locations are illustrative as firms are only identified geographically at the TAZ-level.
+
+### Stops by Activity
+```{r Map_Freight_Stops_By_Activity}
+k <- 25
+map <- leaflet() %>%
+  addProviderTiles(map_type, group = "Background Map")
+map <- map %>% addTAZPoints(data = ft_trips[!Activity %in% c("Return", "Transfer")],
+                            shp = shp, group = "Activity",
+                            scale.factor = k, TAZcol = "TAZ.Destination") %>%
+  addTAZPolygons()
+map
+```
+
+> Note: Each data point represents `r comma(k)` stops and precise locations are illustrative as firms are only identified geographically at the TAZ-level.
+
+Calibration {data-navmenu="Freight Truck Tours"}
+============================================
+
+Chart Column 1
+--------------------------------------------
+
+### Vehicle Shares
+
+```{r Calibration_Freight_Vehicle_Shares}
+# Organize
+dat <- ft_trips[, .N, keyby = .(Vehicle, Movement.Type)][order(Vehicle, Movement.Type), .(Vehicle, Simulated = N/sum(N)), by = Movement.Type]
+targets <- data.table(Vehicle = c(rep("Light",3),rep("Medium",3), rep("Heavy",3)),
+                      Movement.Type = rep(c("II", "IX", "XI"),3),
+                      Target = c(0.082, 0.01, 0.01, 0.692, 0.29, 0.29, 0.226, 0.7, 0.7))
+dat[targets, Target := i.Target, on = c("Vehicle", "Movement.Type")]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Freight_Truck_Vehicle_Shares.csv"), row.names = FALSE)
+
+# Plot
+dat <- melt(dat, id.vars = c("Vehicle", "Movement.Type"), value.name = "Share")
+dat[, Vehicle.Movement := factor(paste(Vehicle, Movement.Type, sep = "-"), levels = paste(targets$Vehicle, targets$Movement.Type, sep = "-"))]
+
+bar_plotter(dat, xvar = "Vehicle.Movement", yvar = "Share", fill = "variable", position = "dodge", xrotate = TRUE, legend_label = FALSE)
+```
+
+### Stops per Peddling Tour
+
+```{r Calibration_Freight_Stops_Per_Tour}
+# Organize
+dat <- ft_trips[Peddled == 1L, .N, by = .(TourID, Vehicle)][, .(`Simulated` = mean(N)), by = Vehicle][order(Vehicle)]
+targets <- data.table(Vehicle = c("Light", "Medium", "Heavy"),
+                      Target = c(2.6, 15.1, 6.8))
+dat[targets, Target := i.Target, on = "Vehicle"]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Freight_Truck_Stops_per_Tour.csv"), row.names = FALSE)
+
+# Plot
+dat <- melt(dat, id.vars = "Vehicle", value.name = "Stops/Tour")
+bar_plotter(dat, xvar = "Vehicle", yvar = "Stops/Tour", fill = "variable", position = "dodge", legend_label = FALSE)
+```
+
+### Single-Stop Peddling Tours
+
+```{r Calibration_Freight_Single_Stop_Tours}
+# Organize
+dat <- ft_trips[Peddled == 1L, .(N = sum(Scheduled) - 1L),
+                by = .(TourID, Vehicle)][, .(`Simulated` = sum(N==1L)/.N), by = Vehicle][order(Vehicle)]
+targets <- data.table(Vehicle = c("Light", "Medium", "Heavy"),
+                      Target = c(0.414, 0.070, 0.182))
+dat[targets, Target := i.Target, on = "Vehicle"]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Freight_Truck_Single_Stop_Tour_Shares.csv"), row.names = FALSE)
+
+# Plot
+dat <- melt(dat, id.vars = "Vehicle", value.name = "Share")
+bar_plotter(dat, xvar = "Vehicle", yvar = "Share", fill = "variable", position = "dodge", legend_label = FALSE)
+```
+
+> Note: The proportion of single-stop tours is not directly calibrated.
+
+Chart Column 2
+--------------------------------------------
+
+### First Stop Arrival Time
+
+```{r Freight_Truck_First_Stop_Arrival_Time}
+# Organize
+dat <- ft_trips[TripID == 1L, .(TourID, MAMArrive)]
+dat[, `Arrival Time` := cut(MAMArrive, breaks = tod_breaks30, labels = tod_labels30, ordered_result = TRUE, right = FALSE)]
+dat <- dat[, .N, by = `Arrival Time`][order(`Arrival Time`), .(`Arrival Time`, Share = N/sum(N))]
+targets <- data.table(`Arrival Time` = tod_labels30,
+                      Share = c(0.004388279, 0.013164838, 0.013164838, 0.008776559,
+                                0.000000000, 0.017553117, 0.013164838, 0.013164838,
+                                0.013164838, 0.026329676, 0.035106234, 0.032609484,
+                                0.030717955, 0.032609484, 0.062116995, 0.049557379,
+                                0.069607246, 0.078383805, 0.049633242, 0.048952157,
+                                0.038284070, 0.019444646, 0.008171337, 0.032004262,
+                                0.023832925, 0.018839424, 0.036392541, 0.030112733,
+                                0.023832925, 0.025119232, 0.015056367, 0.017553117,
+                                0.016342674, 0.004388279, 0.008171337, 0.004388279,
+                                0.003783057, 0.008776559, 0.004388279, 0.001891529,
+                                0.010668087, 0.000000000, 0.008776559, 0.008171337,
+                                0.000000000, 0.008776559, 0.006279808, 0.004388279))
+dat[targets, Target := i.Share, on = "Arrival Time"]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Freight_Truck_Arrival_Time_Shares.csv"), row.names = FALSE)
+
+# Plot
+dat <- melt(dat, id.vars = "Arrival Time")
+
+bar_plotter(dat, xvar = "Arrival Time", yvar = "value", fill = "variable", position = "dodge", coord_flip = TRUE, legend_label = FALSE)
+```
+
+Chart Column 3
+--------------------------------------------
+
+### Intermediate Stops per Scheduled Stop
+
+```{r Calibration_Freight_Intermediate_Per_Scheduled_Stop}
+# Organize
+dat <- ft_trips[, .(Simulated = sum(Scheduled == 0L)/(sum(Scheduled == 1L) - 1L)),
+                by = Vehicle][order(Vehicle)]
+targets <- data.table(Vehicle = c("Light", "Medium", "Heavy"),
+                      Target = c(0.094, 0.067, 0.040))
+dat[targets, Target := i.Target, on = "Vehicle"]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Freight_Truck_IntermediateStops_per_ScheduledStop.csv"), row.names = FALSE)
+
+# Plot
+dat <- melt(dat, id.vars = "Vehicle", value.name = "Intermediate Stops/Scheduled Stop")
+p <- ggplot(dat, aes(x = Vehicle, y = `Intermediate Stops/Scheduled Stop`, fill = variable)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_y_continuous(labels = comma) +
+  theme_db + theme(legend.title=element_blank())
+ggplotly(p)
+```
+
+### Meal or Break Stops per 8 Hours
+
+```{r Calibration_Freight_MealBreak_Stops_Per_8Hours}
+# Organize
+dat <- ft_trips[, .(Simulated = sum(Activity == "Break/Meal")/(sum(TravelTime + StopDuration)/(8*60))),
+                by = Vehicle][order(Vehicle)]
+targets <- data.table(Vehicle = c("Light", "Medium", "Heavy"),
+                      Target = c(0.219, 0.290, 0.229))
+dat[targets, Target := i.Target, on = "Vehicle"]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Freight_Truck_MealBreak_Stops_per_8Hours.csv"), row.names = FALSE)
+
+# Plot
+dat <- melt(dat, id.vars = "Vehicle", value.name = "Meal or Break Stops/8 Hours")
+p <- ggplot(dat, aes(x = Vehicle, y = `Meal or Break Stops/8 Hours`, fill = variable)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_y_continuous(labels = comma) +
+  theme_db + theme(legend.title=element_blank())
+ggplotly(p)
+```
+
+### Refueling Stops per 100 miles
+
+```{r Calibration_Freight_Refueling_Stops_Per_100Miles}
+# Organize
+dat <- ft_trips[, .(Simulated = sum(Activity == "Vehicle Service")/(sum(Distance)/100)),
+                by = Vehicle][order(Vehicle)]
+targets <- data.table(Vehicle = c("Light", "Medium", "Heavy"),
+                      Target = c(0.205, 0.191, 0.100))
+dat[targets, Target := i.Target, on = "Vehicle"]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Freight_Truck_Refueling_Stops_per_100Miles.csv"), row.names = FALSE)
+
+# Plot
+dat <- melt(dat, id.vars = "Vehicle", value.name = "Refueling Stops/100 Miles")
+p <- ggplot(dat, aes(x = Vehicle, y = `Refueling Stops/100 Miles`, fill = variable)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_y_continuous(labels = comma) +
+  theme_db + theme(legend.title=element_blank())
+ggplotly(p)
+```
+
+Charts {data-navmenu="Commercial Vehicle Tours"}
+============================================
+
+Highlights {data-width=150}
+--------------------------------------------
+
+### Commercial Vehicle Tours
+
+```{r Commercial_Vehicle_Tours_ValueBox2}
+CommercialVehicleTours.ValueBox
+```
+
+### Total Stops
+
+```{r Commercial_Vehicle_Total_Stops_ValueBox}
+value <- format(cv_trips[Activity != "Return", .N], big.mark = ",", trim = TRUE)
+valueBox(value, "Total Stops", icon = "fa-map-marker", color = "success")
+```
+
+### Goods Stops
+
+```{r Commercial_Vehicle_Goods_Stops_ValueBox}
+value <- format(cv_trips[Activity == "Goods", .N], big.mark = ",", trim = TRUE)
+valueBox(value, "Goods Deliveries", icon = "fa-cube")
+```
+
+### Service Stops
+
+```{r Commercial_Vehicle_Service_Stops_ValueBox}
+value <- format(cv_trips[Activity == "Service", .N], big.mark = ",", trim = TRUE)
+valueBox(value, "Service Stops", icon = "fa-wrench")
+```
+
+### Meeting Stops
+
+```{r Commercial_Vehicle_Meeting_Stops_ValueBox}
+value <- format(cv_trips[Activity == "Meeting", .N], big.mark = ",", trim = TRUE)
+valueBox(value, "Meeting Stops", icon = "fa-briefcase")
+```
+
+### Intermediate Stops
+
+```{r Commercial_Vehicle_Intermediate_Stops_ValueBox}
+value <- format(cv_trips[Scheduled == 0L, .N], big.mark = ",", trim = TRUE)
+valueBox(value, "Intermediate Stops", icon = "fa-cutlery")
+```
+
+Chart Column 1 {data-width=283}
+--------------------------------------------
+
+### Commercial Vehicle Trip Orgins by County
+
+```{r Chart_Commercial_Trips_Origins_by_County}
+# Organize
+dat <- cv_trips[, .(County = County.Origin, Vehicle)]
+dat[, County := factor(County, levels = sort_levels(County))]
+dat <- dat[,.N, by = .(County, Vehicle)][order(County)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Commercial_Trip_Origins_by_County.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "County", yvar = "N", fill = "Vehicle", xlabel = "Trip Origin County", ylabel = "Commercial Vehicle Trips", coord_flip = TRUE)
+```
+
+### Commercial Vehicle Trip Destinations by County
+
+```{r Chart_Commercial_Trips_Destinations_by_County}
+# Organize
+dat <- cv_trips[, .(County = County.Destination, Vehicle)]
+dat[, County := factor(County, levels = sort_levels(County))]
+dat <- dat[,.N, by = .(County, Vehicle)][order(County)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Commercial_Trip_Destinations_by_County.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "County", yvar = "N", fill = "Vehicle", xlabel = "Trip Destination County", ylabel = "Commercial Vehicle Trips", coord_flip = TRUE)
+```
+
+### Commercial Vehicle Tour Start Locations by County
+
+```{r Chart_Commercial_Tour_Starts_by_County}
+# Organize
+dat <- cv_trips[TripID == 1, .(County = County.Start, Vehicle)]
+dat[, County := factor(County, levels = sort_levels(County))]
+dat <- dat[,.N, by = .(County, Vehicle)][order(County)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Commercial_Tour_Start_Locations_by_County.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "County", yvar = "N", fill = "Vehicle", xlabel = "Tour Start County", ylabel = "Commercial Vehicle Tours", coord_flip = TRUE)
+```
+
+Chart Column 2 {data-width=283}
+--------------------------------------------
+
+### Commercial Vehicle Stop Activities by County
+
+```{r Chart_Commercial_Stop_Activity_by_County}
+# Organize
+dat <- cv_trips[, .(County = County.Destination, Activity)]
+dat[, County := factor(County, levels = sort_levels(County))]
+dat <- dat[,.N, by = .(County, Activity)][order(County)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Commercial_Stop_Acitivity_by_County.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "County", yvar = "N", fill = "Activity", xlabel = "Stop Location County", ylabel = "Commercial Vehicle Stops", coord_flip = TRUE)
+```
+
+
+### Commercial Vehicle Trip Activities by Vehicle
+
+```{r Chart_Commercial_Trips_Activity_by_Vehicle}
+# Organize
+dat <- cv_trips[, .(Activity, Vehicle)][order(Activity, Vehicle)]
+dat[, Activity := factor(Activity, levels = sort_levels(Activity))]
+dat <- dat[,.N, by = .(Activity, Vehicle)][order(Activity)]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Commercial_Trip_Activity_by_Vehicle.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "Activity", yvar = "N", fill = "Vehicle", xlabel = "Trip Activity", ylabel = "Commercial Vehicle Trips", coord_flip = TRUE)
+```
+
+### Commercial Vehicle Tour Average Stops by Tour Start County
+
+```{r Chart_Commercial_Average_Stops_Tour_by_County}
+# Organize
+dat <- merge(cv_trips[,.(Stops = .N) , by = .(County = County.Start, Activity)],
+             cv_trips[,.(Tours = length(unique(TourID))), by = .(County = County.Start)],
+             by = "County")
+dat[, StopsPerTour := Stops/Tours]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Commercial_Trips_Tours_by_County.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "County", yvar = "StopsPerTour", fill = "Activity", xlabel = "Tour Start County", ylabel = "Commercial Vehicle Stops per Tour", coord_flip = TRUE)
+```
+
+Densities {data-navmenu="Commercial Vehicle Tours"}
+============================================
+
+Density Column 1
+--------------------------------------------
+
+### First Stop Arrival Time by Vehicle
+
+```{r Density_Commercial_Arrival_Time_By_Vehicle}
+# Organize
+dat <- cv_trips[TripID == 1L, .(`Arrival Time` = as.numeric(MAMArrive), Vehicle)]
+
+# Save
+
+# Plot
+breaks <- seq(from = 0, to = 1439, 60)
+p <- ggplot(dat, aes(x = `Arrival Time`, fill = Vehicle)) +
+  geom_density(alpha = 0.25) + ylab("Density") +
+  scale_x_continuous(breaks = breaks, labels = labelMAM(breaks)) +
+  theme_db + theme(axis.text = element_text(angle = 90, hjust = 1))
+ggplotly(p)
+```
+
+### First Stop Arrival Time by Activity
+
+```{r Density_Commercial_Arrival_Time_By_Activity}
+# Organize
+cv_trips[Scheduled == 1L, MinTripID := min(TripID), by = .(BusID, Vehicle, TourID)]
+dat <- cv_trips[TripID == MinTripID, .(`Arrival Time` = as.numeric(MAMArrive), Activity)]
+
+# Save
+
+# Plot
+breaks <- seq(from = 0, to = 1439, 60)
+p <- ggplot(dat, aes(x = `Arrival Time`, fill = Activity)) +
+  geom_density(alpha = 0.25) + ylab("Density") +
+  scale_x_continuous(breaks = breaks, labels = labelMAM(breaks)) +
+  theme_db + theme(axis.text = element_text(angle = 90, hjust = 1))
+ggplotly(p)
+```
+
+### Number of Stops per Tour by Activity
+
+```{r Density_Commercial_Stops_per_Tour_By_Activity}
+# Organize
+dat <- cv_trips[, .(`Number of Stops` = .N), by = .(TourID, Activity)]
+ 
+# Save
+ 
+# Plot
+alpha <- 0.95
+x.limits <- c(0, quantile(dat$`Number of Stops`, alpha))
+p <- ggplot(dat, aes(x = `Number of Stops`, fill = Activity)) +
+   geom_density(alpha = 0.25, position = "stack") + ylab("Density") + xlim(x.limits) +
+   theme_db
+ggplotly(p)
+```
+
+> Note: `r percent(1 - alpha)` of stops are longer than `r round(x.limits[2])` minutes and are not displayed.
+
+
+Density Column 2 {.tabset .tabset-fade}
+--------------------------------------------
+
+### Tour Length by Vehicle
+
+```{r Density_Commercial_Tour_Length_By_Vehicle}
+# Organize
+dat <- cv_trips[, .(`Tour Length (miles)` = sum(Distance)), by = .(BusID, Vehicle, TourID)]
+
+# Save
+
+# Plot
+alpha <- 0.95
+x.limits <- c(0, quantile(dat$`Tour Length (miles)`, alpha))
+p <- ggplot(dat, aes(x = `Tour Length (miles)`, fill = Vehicle)) +
+  geom_density(alpha = 0.25) + ylab("Density") + xlim(x.limits) +
+  theme_db
+
+ggplotly(p)
+```
+
+> Note: `r percent(1 - alpha)` of trips are longer than `r round(x.limits[2])` miles and are not displayed.
+
+### Trip Length by Vehicle
+
+```{r Density_Commercial_Trip_Length_By_Vehicle}
+# Organize
+dat <- cv_trips[, .(Vehicle, `Trip Length (miles)` = Distance)]
+
+# Save
+
+# Plot
+alpha <- 0.95
+x.limits <- c(0, quantile(dat$`Trip Length (miles)`, alpha))
+p <- ggplot(dat, aes(x = `Trip Length (miles)`, fill = Vehicle)) +
+  geom_density(alpha = 0.25) + ylab("Density") + xlim(x.limits) +
+  theme_db
+ggplotly(p)
+```
+
+> Note: `r percent(1 - alpha)` of trips are longer than `r round(x.limits[2])` miles and are not displayed.
+
+### Tour Duration by Vehicle
+
+```{r Density_Commercial_Tour_Duration_By_Vehicle}
+# Organize
+dat <- cv_trips[, .(`Tour Duration (mins)` = sum(TravelTime+StopDuration)),
+                by = .(BusID, Vehicle, TourID)]
+
+# Save
+
+# Plot
+alpha <- 0.95
+x.limits <- c(0, quantile(dat$`Tour Duration (mins)`, alpha))
+p <- ggplot(dat, aes(x = `Tour Duration (mins)`, fill = Vehicle)) +
+  geom_density(alpha = 0.25) + ylab("Density") + xlim(x.limits) +
+  theme_db
+
+ggplotly(p)
+```
+
+> Note: `r percent(1 - alpha)` of trips are longer than `r round(x.limits[2])` minutes and are not displayed.
+
+### Trip Duration by Vehicle
+
+```{r Density_Commercial_Trip_Duration_By_Vehicle}
+# Organize
+dat <- cv_trips[, .(Vehicle, `Trip Duration (mins)` = TravelTime)]
+
+# Save
+
+# Plot
+alpha <- 0.95
+x.limits <- c(0, quantile(dat$`Trip Duration (mins)`, alpha))
+p <- ggplot(dat, aes(x = `Trip Duration (mins)`, fill = Vehicle)) +
+  geom_density(alpha = 0.25) + ylab("Density") + xlim(x.limits) +
+  theme_db
+ggplotly(p)
+```
+
+> Note: `r percent(1 - alpha)` of trips are longer than `r round(x.limits[2])` minutes and are not displayed.
+
+### Stop Duration by Vehicle
+
+```{r Density_Commercial_Stop_Duration_By_Vehicle}
+# Organize
+dat <- cv_trips[Activity != "Return", .(Vehicle, `Stop Duration (minutes)` = StopDuration)]
+
+# Save
+
+# Plot
+alpha <- 0.95
+x.limits <- c(0, quantile(dat$`Stop Duration (minutes)`, alpha))
+p <- ggplot(dat, aes(x = `Stop Duration (minutes)`, fill = Vehicle)) +
+  geom_density(alpha = 0.25) + ylab("Density") + xlim(x.limits) +
+  theme_db
+ggplotly(p)
+```
+
+> Note: `r percent(1 - alpha)` of stops are longer than `r round(x.limits[2])` minutes and are not displayed.
+
+### Stop Duration by Activity
+
+```{r Density_Commercial_Stop_Duration_By_Activity}
+# Organize
+dat <- cv_trips[Activity != "Return", .(Activity, `Stop Duration (minutes)` = StopDuration)]
+
+# Save
+
+# Plot
+alpha <- 0.95
+x.limits <- c(0, quantile(dat$`Stop Duration (minutes)`, alpha))
+p <- ggplot(dat, aes(x = `Stop Duration (minutes)`, fill = Activity)) +
+  geom_density(alpha = 0.25) + ylab("Density") + xlim(x.limits) +
+  theme_db
+ggplotly(p)
+```
+
+> Note: `r percent(1 - alpha)` of stops are longer than `r round(x.limits[2])` minutes and are not displayed.
+
+Maps {data-navmenu="Commercial Vehicle Tours"}
+============================================
+
+Maps {.tabset .tabset-fade}
+--------------------------------------------
+
+<!-- ### Stops Over Time -->
+
+<!-- ```{r Map_Commercial_Stops_Over_Time} -->
+<!-- stops_total <- cv_trips[, TimeBins := as.factor(floor(MAMArrive / 60))] -->
+<!-- stops_total <- stops_total[, .N, by = .(DTAZ, TimeBins)] -->
+<!-- stops_total[, nPts := floor(log(N) / 3.5)] -->
+<!-- stops_total <- stops_total[nPts > 0] -->
+<!-- map <- leaflet_custom(elementId = "cvstoptime") %>% -->
+<!--   addProviderTiles(map_type, group = "Background Map") %>% -->
+<!--   setView(-77.4618, 38.72869, 8) -->
+<!-- map$dependencies <- c(map$dependencies, list(htmlDependency( -->
+<!--   name = "leaflet-timeline", -->
+<!--   version = "1.0.0", -->
+<!--   src = c("file" = SYSTEM_TEMPLATES_PATH), -->
+<!--   script = "javascripts/leaflet.timeline.js", -->
+<!--   stylesheet = "stylesheets/leaflet.timeline.css" -->
+<!-- ))) -->
+<!-- map_center <- coordinates(shp_outline) -->
+<!-- dimnames(map_center)[[2]] <- c("lon", "lat") -->
+<!-- ghost_df <- data.frame() -->
+<!-- points_df <- data.frame() -->
+<!-- setkey(stops_total, DTAZ) -->
+<!-- for (time_bin in levels(stops_total[["TimeBins"]])) { -->
+<!--   stops_time <- stops_total[TimeBins == time_bin, .(DTAZ, nPts)] -->
+<!--   for (i in seq_len(nrow(stops_time))) { -->
+<!--     points <- NULL -->
+<!--     n <- stops_time[i, nPts] -->
+<!--     if (n < 1) { -->
+<!--       next -->
+<!--     } -->
+<!--     polygon_TAZ <- shp[shp@data$TAZ == stops_time[i, DTAZ], ] -->
+<!--     tryCatch( -->
+<!--       { -->
+<!--         points <- spsample(polygon_TAZ, n = n, type = "random")@coords -->
+<!--       }, -->
+<!--       error = function(e) { -->
+<!--         NULL -->
+<!--       } -->
+<!--     ) -->
+<!--     if (!is.null(points)) { -->
+<!--       dimnames(points)[[2]] <- c("lon", "lat") -->
+<!--       start <- strptime(sprintf("2000-01-01 %02d:00", as.integer(time_bin)), format = "%Y-%m-%d %H:%M") -->
+<!--       end   <- strptime(sprintf("2000-01-01 %02d:59", as.integer(time_bin)), format = "%Y-%m-%d %H:%M") -->
+<!--       points_df <- rbind(points_df, data.frame(points, "start" = start, "end" = end)) -->
+<!--     } -->
+<!--   } -->
+<!--   start <- strptime(sprintf("2000-01-01 %02d:00",  as.integer(time_bin)     ), format = "%Y-%m-%d %H:%M") -->
+<!--   end   <- strptime(sprintf("2000-01-01 %02d:00", (as.integer(time_bin) + 1)), format = "%Y-%m-%d %H:%M") -->
+<!--   if (!is.null(points)) { -->
+<!--     ghost_df <- rbind(ghost_df, data.frame(points, "start" = start, "end" = end)) -->
+<!--   } -->
+<!-- } -->
+<!-- ghost_json <- geojson_json(ghost_df, lat = "lat", lon = "lon") -->
+<!-- points_json <- geojson_json(points_df, lat = "lat", lon = "lon") -->
+<!-- map %>% -->
+<!--   onRender(sprintf( -->
+<!--     'function(el,x){ -->
+<!--       var slider = L.timelineSliderControl({ -->
+<!--         steps: 48, -->
+<!--         duration: 24000, -->
+<!--         showTicks: true, -->
+<!--         waitToUpdateMap: true, -->
+<!--         formatOutput: function(date){ -->
+<!--           return new Date(date).toLocaleTimeString("en-US", { hour12: false, second: undefined }); -->
+<!--         } -->
+<!--       }); -->
+<!--       HTMLWidgets.find("#cvstoptime").addControl(slider); -->
+<!--       var timeline = L.timeline(%s, { -->
+<!--         pointToLayer: function(data, latlng){ -->
+<!--           return L.circle(latlng, 200, { -->
+<!--             fillOpacity: 1, -->
+<!--             opacity: 1 -->
+<!--           }); -->
+<!--         } -->
+<!--       }); -->
+<!--       timeline.addTo(HTMLWidgets.find("#cvstoptime")); -->
+<!--       var ghostTimeline = L.timeline(%s, { -->
+<!--         pointToLayer: function(data, latlng){ -->
+<!--           return L.circle(latlng, 1, { -->
+<!--             fillOpacity: 0, -->
+<!--             opacity: 0 -->
+<!--           }); -->
+<!--         } -->
+<!--       }); -->
+<!--       ghostTimeline.addTo(HTMLWidgets.find("#cvstoptime")); -->
+<!--       slider.addTimelines(timeline, ghostTimeline); -->
+<!--     }', -->
+<!--     points_json, -->
+<!--     ghost_json -->
+<!--   )) -->
+<!-- ``` -->
+
+<!-- ### Sampled Tours -->
+
+<!-- ```{r Map_Commercial_Sample_Tours} -->
+<!-- javascript <- 'function(el, x) { -->
+<!--   var basemaps = {};' -->
+<!-- map <- leaflet_custom(elementId = "cv_sampletours") %>% -->
+<!--   addProviderTiles(map_type, group = "Background Map") %>% -->
+<!--   setView(-77.4618, 38.72869, 8) %>% -->
+<!--   addControl( -->
+<!--     '<div class="leaflet-div-icon-cv-service leaflet-div-icon-legend"></div>Service<br><div class="leaflet-div-icon-cv-return leaflet-div-icon-legend"></div>Return<br><div class="leaflet-div-icon-cv-other leaflet-div-icon-legend"></div>Other<br><div class="leaflet-div-icon-cv-break_meal leaflet-div-icon-legend"></div>Break/Meal<br><div class="leaflet-div-icon-cv-goods leaflet-div-icon-legend"></div>Goods<br><div class="leaflet-div-icon-cv-meeting leaflet-div-icon-legend"></div>Meeting<br><div class="leaflet-div-icon-cv-vehicle_service leaflet-div-icon-legend"></div>Vehicle Service<br>', -->
+<!--     position = "bottomright" -->
+<!--   ) -->
+<!-- map$dependencies <- c(map$dependencies, list(htmlDependency( -->
+<!--   name = "leaflet-polylinedecorator", -->
+<!--   version = "1.1.0", -->
+<!--   src = c("file" = SYSTEM_TEMPLATES_PATH), -->
+<!--   script = "javascripts/leaflet.polylineDecorator.js" -->
+<!-- ))) -->
+<!-- for (industry in levels(AllFirmsReg$Industry5)) { -->
+<!--   i <- 1 -->
+<!--   max <- 6 -->
+<!--   possible_businesses <- AllFirmsReg[BusID %in% unique(cv_trips[, TourID, by = BusID])[, .N, by = BusID][N == max, BusID] & Industry5 == industry, BusID] -->
+<!--   while (TRUE) { -->
+<!--     business <- cv_trips[BusID == possible_businesses[i], ] -->
+<!--     if (uniqueN(business[, .(TripID, OTAZ, DTAZ)]) == nrow(business)) { -->
+<!--       break -->
+<!--     } -->
+<!--     i <- i + 1 -->
+<!--     if (i > length(possible_businesses)) { -->
+<!--       max <- max - 1 -->
+<!--       possible_businesses <- AllFirmsReg[BusID %in% unique(cv_trips[, TourID, by = BusID])[, .N, by = BusID][N == max, BusID] & Industry5 == industry, BusID] -->
+<!--       i <- 1 -->
+<!--     } -->
+<!--   } -->
+<!--   pal <- colorFactor(palette = "Set1", levels = unique(business$TourID)) -->
+<!--   javascript <- paste0(javascript, sprintf('var lG_%s = L.layerGroup();', gsub("[^[:alpha:]]", "_", industry))) -->
+<!--   for (tour in unique(business$TourID)) { -->
+<!--     coords <- coordinates(shp[shp@data$TAZ %in% business[TourID == tour, OTAZ], ]) -->
+<!--     coords <- rbind(coords, coords[1, c(1, 2)]) # This assumes that the tour is a closed walk (beginning and ending vertices are identical) -->
+<!--     coords[ , c(1,2)] <- coords[ , c(2,1)] -->
+<!--     javascript <- paste0(javascript, sprintf( -->
+<!-- 'var pl_%s = L.polyline(%s, {opacity: 1, weight: 3, color: "%s"}); -->
+<!-- lG_%s.addLayer(pl_%s);', -->
+<!--       tour, -->
+<!--       toJSON(coords), -->
+<!--       pal(tour), -->
+<!--       gsub("[^[:alpha:]]", "_", industry), -->
+<!--       tour -->
+<!--     )) -->
+<!--     for (i in 1:(nrow(coords) - 1)) { -->
+<!--       javascript <- paste0(javascript, sprintf( -->
+<!-- 'var plDec_%s = L.polylineDecorator(%s, { -->
+<!-- patterns: [{offset: "100%%", repeat: 0, symbol: L.Symbol.arrowHead({pixelSize: 15, pathOptions: {fillOpacity: 1, weight: 0, color: "%s"}})}] -->
+<!-- }); -->
+<!-- lG_%s.addLayer(plDec_%s);', -->
+<!--         paste0(tour, i), -->
+<!--         toJSON(coords[i:(i + 1),c(1,2)]), -->
+<!--         pal(tour), -->
+<!--         gsub("[^[:alpha:]]", "_", industry), -->
+<!--         paste0(tour, i) -->
+<!--       )) -->
+<!--     } -->
+<!--   } -->
+<!--   for (activity in unique(business$Activity)) { -->
+<!--     coords <- coordinates(shp[shp@data$TAZ %in% business[Activity == activity, DTAZ], ]) -->
+<!--     coords <- rbind(coords, coords[1, c(1, 2)]) -->
+<!--     coords[ , c(1,2)] <- coords[ , c(2,1)] -->
+<!--     for (i in 1:(nrow(coords) - 1)) { -->
+<!--       javascript <- paste0(javascript, sprintf( -->
+<!-- 'var plDec_%s = L.polylineDecorator(%s, { -->
+<!-- patterns: [{offset: 0, repeat: 0, symbol: L.Symbol.marker({markerOptions: {icon: L.divIcon({className: "leaflet-div-icon-cv-%s"})}})}] -->
+<!-- }); -->
+<!-- lG_%s.addLayer(plDec_%s);', -->
+<!--         paste0(tolower(gsub("[^[:alpha:]]", "_", activity)), i), -->
+<!--         toJSON(coords[i:(i + 1),c(1,2)]), -->
+<!--         tolower(gsub("[^[:alpha:]]", "_", activity)), -->
+<!--         gsub("[^[:alpha:]]", "_", industry), -->
+<!--         paste0(tolower(gsub("[^[:alpha:]]", "_", activity)), i) -->
+<!--       )) -->
+<!--     } -->
+<!--   } -->
+<!--   javascript <- paste0(javascript, sprintf( -->
+<!-- 'basemaps["%s"] = lG_%s;', -->
+<!--     industry, -->
+<!--     gsub("[^[:alpha:]]", "_", industry) -->
+<!--   )) -->
+<!-- } -->
+<!-- javascript <- paste0(javascript, sprintf( -->
+<!-- 'lG_%s.addTo(HTMLWidgets.find("#%s")); -->
+<!-- L.control.layers(basemaps, {}).addTo(HTMLWidgets.find("#%s")); -->
+<!-- }', -->
+<!--   gsub("[^[:alpha:]]", "_", levels(AllFirmsReg$Industry5)[1]), -->
+<!--   "cv_sampletours", -->
+<!--   "cv_sampletours" -->
+<!-- )) -->
+<!-- map <- onRender(map, javascript) -->
+<!-- map -->
+<!-- ``` -->
+
+<!-- > Note: These are a sampling of tours of a single firm in the selected industry for illustrative purposes. -->
+
+### Stops by Vehicle Type
+
+```{r Map_Commercial_Stops_By_Vehicle}
+k <- 25
+map <- leaflet() %>%
+  addProviderTiles(map_type, group = "Background Map")
+map <- map %>% addTAZPoints(data = cv_trips[Activity != "Return"],
+                            shp = shp, group = "Vehicle",
+                            scale.factor = k, TAZcol = "DTAZ") %>%
+  addTAZPolygons()
+map
+```
+
+> Note: Each data point represents `r comma(k)` stops and precise locations are illustrative as firms are only identified geographically at the TAZ-level.
+
+### Stops by Activity
+
+```{r Map_Commercial_Stops_By_Activity}
+k <- 25
+map <- leaflet() %>%
+  addProviderTiles(map_type, group = "Background Map")
+map <- map %>% addTAZPoints(data = cv_trips[Activity != "Return"],
+                            shp = shp, group = "Activity",
+                            scale.factor = k, TAZcol = "DTAZ") %>% 
+  addTAZPolygons()
+map
+```
+
+> Note: Each data point represents `r comma(k)` stops and precise locations are illustrative as firms are only identified geographically at the TAZ-level.
+
+Calibration {data-navmenu="Commercial Vehicle Tours"}
+============================================
+
+Chart Column 1
+--------------------------------------------
+
+### Firm-to-Stop Distance
+
+```{r Calibration_Commercial_Firm-Stop_Distance}
+# Organize
+dat <- cv_trips[Scheduled == 1L & Activity != "Return", .(BusID, DTAZ)]
+dat[AllFirmsReg, c("BusTAZ", "Industry") := .(i.TAZ2, i.Industry5),
+    on = "BusID"]
+dat[skims[, .(BusTAZ = OTAZ, DTAZ, distance.avg)],
+    Distance := i.distance.avg/100,
+    on = c("BusTAZ", "DTAZ")]
+dat <- dat[, .(`Mean Distance` = mean(Distance), `Std. Dev.` = sd(Distance)), by = Industry]
+dat[, Industry := factor(as.character(Industry))]
+dat <- dat[order(Industry)]
+targets <- data.table(Industry = c("Industrial", "Retail", "Service", "Transportation Handling", "Wholesale"),
+                      `Target Distance` = c(7.0, 9.2, 6.3, 18.2, 16.2),
+                      `Target Std. Dev.` = c(8.7, 10.4, 8.1, 16.5, 14.2))
+dat[targets, c("Target Distance", "Target Std. Dev.") := .(`i.Target Distance`, `i.Target Std. Dev.`),
+    on = "Industry"]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Commercial_Vehicle_Firm-Stop_Distance.csv"), row.names = FALSE)
+
+# Plot
+dat <- rbind(dat[, .(Industry, variable = "Simulated", `Mean Distance`, `Std. Dev.`)],
+             dat[, .(Industry, variable = "Target", `Mean Distance` = `Target Distance`, `Std. Dev.` = `Target Std. Dev.`)])
+p <- ggplot(dat, aes(x = Industry, y = `Mean Distance`, fill = variable)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymax = `Mean Distance` + `Std. Dev.`, ymin = `Mean Distance` - `Std. Dev.`), position = "dodge") +
+  scale_y_continuous(labels = comma) +
+  theme_db + theme(axis.text.x = element_text(angle = 45, hjust = 1),
+                   legend.title = element_blank())
+ggplotly(p)
+
+```
+
+> Note: Bar whiskers represent one standard deviation.
+
+### Scheduled Stops per Tour
+
+```{r Calibration_Commercial_Stops_Per_Tour}
+# Organize
+dat <- cv_trips[Scheduled == 1L, .(BusID, TourID, TripID)]
+dat[AllFirmsReg, Industry := i.Industry5, on = "BusID"]
+dat <- dat[, .N, by = .(TourID, Industry)][, .(`Simulated` = mean(N)), by = Industry][order(as.character(Industry))]
+targets <- data.table(Industry = c("Industrial", "Retail", "Service", "Transportation Handling", "Wholesale"),
+                      Target = c(2.0, 2.5, 2.9, 2.7, 8.6))
+dat[targets, Target := i.Target, on = "Industry"]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Commercial_ScheduledStops_per_Tour.csv"), row.names = FALSE)
+
+# Plot
+dat <- melt(dat, id.vars = "Industry", value.name = "Scheduled Stops/Tour")
+bar_plotter(dat, xvar = "Industry", yvar = "Scheduled Stops/Tour", fill = "variable", position = "dodge", xrotate = TRUE, legend_label = FALSE)
+```
+
+### Single-Stop Tours
+
+```{r Calibration_Commercial_Single_Stop_Tours}
+# Organize
+dat <- cv_trips[Activity != "Return", .(BusID, TourID, TripID, Scheduled)]
+dat[AllFirmsReg, Industry := i.Industry5, on = "BusID"]
+dat <- dat[, .(N = sum(Scheduled)),
+               by = .(TourID, Industry)][, .(`Simulated` = sum(N==1L)/.N), by = Industry][order(as.character(Industry))]
+targets <- data.table(Industry = c("Industrial", "Retail", "Service", "Transportation Handling", "Wholesale"),
+                      Target = c(0.541, 0.394, 0.498, 0.715, 0.203))
+dat[targets, Target := i.Target, on = "Industry"]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Commercial_Single_Stop_Tour_Shares.csv"), row.names = FALSE)
+
+# Plot
+dat <- melt(dat, id.vars = "Industry", value.name = "Share")
+bar_plotter(dat, xvar = "Industry", yvar = "Share", fill = "variable", position = "dodge", xrotate = TRUE, legend_label = FALSE)
+```
+
+Chart Column 2 {.tabset}
+--------------------------------------------
+
+### Vehicle Shares (Simulated)
+
+```{r Calibration_Commercial_Vehicle_Shares1}
+# Organize
+dat <- cv_trips[, .N, by = .(BusID, Vehicle)]
+dat[AllFirmsReg, Industry := i.Industry10, on = "BusID"]
+dat <- dat[, .(N = sum(N)), by = .(Industry, Vehicle)][order(Industry, Vehicle)]
+dat[, Simulated := N/sum(N), by = Industry]
+Industry10 <- c("Agriculture", "Construction", "Government", "Health",
+                "Hotel & Real Estate", "Manufacturing", "Other Services",
+                "Retail", "Transportation Handling", "Wholesale")
+Vehicles <- c("Light", "Medium", "Heavy")
+targets <- data.table(Industry = rep(Industry10, each = length(Vehicles)),
+                      Vehicle = rep(c("Light", "Medium", "Heavy"), times = length(Industry10)),
+                  Share = c(0.40, 0.52, 0.08, 0.71, 0.22, 0.07,
+                            0.90, 0.07, 0.03, 0.96, 0.04, 0.00,
+                            0.93, 0.07, 0.00, 0.36, 0.35, 0.29,
+                            0.89, 0.09, 0.02, 0.68, 0.21, 0.11,
+                            0.04, 0.22, 0.74, 0.29, 0.46, 0.25))
+targets[, Vehicle := factor(Vehicle, levels = Vehicles, ordered = TRUE)]
+dat[targets, Target := i.Share, on = c("Industry", "Vehicle")]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Commercial_Vehicle_Shares.csv"), row.names = FALSE)
+
+# Plot
+bar_plotter(dat, xvar = "Industry", yvar = "Simulated", fill = "Vehicle", coord_flip = TRUE, ylabel = "Share")
+```
+
+### Vehicle Shares (Target)
+
+```{r Calibration_Commercial_Vehicle_Shares2}
+# Plot
+bar_plotter(dat, xvar = "Industry", yvar = "Target", fill = "Vehicle", coord_flip = TRUE, ylabel = "Share")
+```
+
+Chart Column 3
+--------------------------------------------
+
+### First Stop Arrival Time
+
+```{r Calibration_Commercial_First_Stop_Arrival_Time}
+# Organize
+dat <- cv_trips[TripID == 1L, .(TourID, MAMArrive)]
+dat[, `Arrival Time` := cut(MAMArrive, breaks = tod_breaks30, labels = tod_labels30, ordered_result = TRUE, right = FALSE)]
+dat <- dat[, .N, by = `Arrival Time`][order(`Arrival Time`), .(`Arrival Time`, Share = N/sum(N))]
+targets <- data.table(`Arrival Time` = tod_labels30,
+                      Share = c(0.0039, 0.0010, 0.0009, 0.0007, 0.0005, 0.0013,
+                                0.0010, 0.0031, 0.0010, 0.0013, 0.0030, 0.0023,
+                                0.0037, 0.0109, 0.0359, 0.0539, 0.0651, 0.0754,
+                                0.0783, 0.0723, 0.0839, 0.0611, 0.0372, 0.0444,
+                                0.0445, 0.0375, 0.0442, 0.0367, 0.0337, 0.0437,
+                                0.0208, 0.0155, 0.0236, 0.0104, 0.0116, 0.0089,
+                                0.0044, 0.0006, 0.0043, 0.0034, 0.0015, 0.0007,
+                                0.0045, 0.0014, 0.0018, 0.0004, 0.0005, 0.0033))
+dat[targets, Target := i.Share, on = "Arrival Time"]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Commercial_Vehicle_Arrival_Time_Shares.csv"), row.names = FALSE)
+
+# Plot
+dat <- melt(dat, id.vars = "Arrival Time")
+bar_plotter(dat, xvar = "Arrival Time", yvar = "value", fill = "variable", position = "dodge", coord_flip = TRUE, legend_label = FALSE)
+```
+
+Chart Column 4
+--------------------------------------------
+
+### Intermediate Stops per Scheduled Stop
+
+```{r Calibration_Commercial_Intermediate_Per_Scheduled_Stop}
+# Organize
+dat <- cv_trips[, .(Simulated = sum(Scheduled == 0L)/(sum(Scheduled == 1L) - 1L)),
+                by = Vehicle][order(Vehicle)]
+targets <- data.table(Vehicle = c("Light", "Medium", "Heavy"),
+                      Target = c(0.094, 0.067, 0.040))
+dat[targets, Target := i.Target, on = "Vehicle"]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Commercial_IntermediateStops_per_ScheduledStop.csv"), row.names = FALSE)
+
+# Plot
+dat <- melt(dat, id.vars = "Vehicle", value.name = "Intermediate Stops/Scheduled Stop")
+p <- ggplot(dat, aes(x = Vehicle, y = `Intermediate Stops/Scheduled Stop`, fill = variable)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_y_continuous(labels = comma) +
+  theme_db + theme(legend.title=element_blank())
+ggplotly(p)
+```
+
+### Meal or Break Stops per 8 Hours
+
+```{r Calibration_Commercial_MealBreak_Stops_Per_8Hours}
+# Organize
+dat <- cv_trips[, .(Simulated = sum(Activity == "Break/Meal")/(sum(TravelTime + StopDuration)/(8*60))),
+                by = Vehicle][order(Vehicle)]
+targets <- data.table(Vehicle = c("Light", "Medium", "Heavy"),
+                      Target = c(0.219, 0.290, 0.229))
+dat[targets, Target := i.Target, on = "Vehicle"]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Commercial_MealBreak_Stops_per_8Hours.csv"), row.names = FALSE)
+
+# Plot
+dat <- melt(dat, id.vars = "Vehicle", value.name = "Meal or Break Stops/8 Hours")
+p <- ggplot(dat, aes(x = Vehicle, y = `Meal or Break Stops/8 Hours`, fill = variable)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_y_continuous(labels = comma) +
+  theme_db + theme(legend.title=element_blank())
+ggplotly(p)
+```
+
+### Refueling Stops per 100 miles
+
+```{r Calibration_Commercial_Refueling_Stops_Per_100Miles}
+# Organize
+dat <- cv_trips[, .(Simulated = sum(Activity == "Vehicle Service")/(sum(Distance)/100)),
+                by = Vehicle][order(Vehicle)]
+targets <- data.table(Vehicle = c("Light", "Medium", "Heavy"),
+                      Target = c(0.205, 0.191, 0.100))
+dat[targets, Target := i.Target, on = "Vehicle"]
+
+# Save
+write.csv(dat, file = file.path(SCENARIO_OUTPUT_PATH, "Commercial_Refueling_Stops_per_100Miles.csv"), row.names = FALSE)
+
+# Plot
+dat <- melt(dat, id.vars = "Vehicle", value.name = "Refueling Stops/100 Miles")
+p <- ggplot(dat, aes(x = Vehicle, y = `Refueling Stops/100 Miles`, fill = variable)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_y_continuous(labels = comma) +
+  theme_db + theme(legend.title=element_blank())
+ggplotly(p)
+```
+

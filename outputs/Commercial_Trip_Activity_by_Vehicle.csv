@@ -1,0 +1,22 @@
+"Activity","Vehicle","N"
+"Service","Light",110924
+"Service","Medium",20361
+"Service","Heavy",7249
+"Return","Light",60608
+"Return","Medium",19267
+"Return","Heavy",9145
+"Meeting","Light",28408
+"Meeting","Medium",4414
+"Meeting","Heavy",1308
+"Goods","Light",6781
+"Goods","Medium",6827
+"Goods","Heavy",10992
+"Other","Light",7184
+"Other","Medium",990
+"Other","Heavy",114
+"Break/Meal","Light",5313
+"Break/Meal","Medium",1469
+"Break/Meal","Heavy",730
+"Vehicle Service","Light",2314
+"Vehicle Service","Medium",744
+"Vehicle Service","Heavy",259

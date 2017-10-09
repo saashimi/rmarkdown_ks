@@ -1,0 +1,31 @@
+"County","Activity","N"
+"Multnomah, OR","Return",5517
+"Multnomah, OR","Delivery",4832
+"Multnomah, OR","Pick-up",1390
+"Multnomah, OR","Vehicle Service",350
+"Multnomah, OR","Other",286
+"Multnomah, OR","Break/Meal",369
+"Multnomah, OR","Transfer",718
+"Washington, OR","Pick-up",2027
+"Washington, OR","Delivery",3240
+"Washington, OR","Vehicle Service",171
+"Washington, OR","Break/Meal",205
+"Washington, OR","Other",135
+"Washington, OR","Return",2488
+"Washington, OR","Transfer",207
+"Clackamas, OR","Delivery",1889
+"Clackamas, OR","Pick-up",1803
+"Clackamas, OR","Break/Meal",140
+"Clackamas, OR","Other",81
+"Clackamas, OR","Vehicle Service",115
+"Clackamas, OR","Return",2425
+"Clackamas, OR","Transfer",345
+"External","Transfer",4638
+"External","Return",1382
+"Clark, WA","Pick-up",538
+"Clark, WA","Break/Meal",101
+"Clark, WA","Delivery",2265
+"Clark, WA","Other",70
+"Clark, WA","Vehicle Service",68
+"Clark, WA","Return",942
+"Clark, WA","Transfer",41
