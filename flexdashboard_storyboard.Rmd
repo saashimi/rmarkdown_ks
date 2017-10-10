@@ -27,20 +27,25 @@ Flexdashboard column space. We can reserve this space for summary text, etc. In 
 
 - Etc.
 
-### Another Page
-
-
-***
-Sidebar commentary
-
-### D3 Heatmap example. You can start to see how this format works a bit better for sequentially summarizing data.
+### D3 Heatmap example using car data. You can start to see how this format works a bit better for sequentially summarizing data.
 
 ```{r}
 cars2017 <- read.csv("cars2017.csv", row.names=1)
 library(d3heatmap)
-d3heatmap(cars2017, scale="column", dendrogram="none")
+d3heatmap(cars2017, scale="column", dendrogram="none", colors="Blues")
 ```
 
 ***
 An example using d3heatmap library.
+
+
+### Game of Thrones character screentimes.
+
+```{r}
+GoT <- read.csv("GoT_actors.csv", row.names=1)
+plot(GoT)
+```
+
+***
+Winter is here.
 
