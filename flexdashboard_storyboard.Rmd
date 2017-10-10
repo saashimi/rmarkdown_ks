@@ -42,9 +42,15 @@ An example of visualizing car data using d3heatmap library.
 ### Game of Thrones character screentimes.
 
 ```{r}
-
-GoT <- read.csv("GoT_actors.csv", row.names=1)
-bar_plotter(dat, xvar = "actor", yvar = "", fill = "season1", xrotate = TRUE, coord_flip = TRUE)
+GoT <- read.csv("GoT_actors.csv")
+library("plotly")
+p <- plot_ly(
+  GoT, 
+  x = ~season.1, 
+  y = ~actor, 
+  type = 'bar'
+)
+p
 ```
 
 ***
