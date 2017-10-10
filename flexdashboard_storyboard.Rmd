@@ -1,0 +1,46 @@
+---
+title: "HTML Storyboard Example"
+output: 
+  flexdashboard::flex_dashboard:
+    storyboard: true
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+```
+
+### Embedded Leaflet Map
+
+```{r}
+library(leaflet)
+m <- leaflet() 
+  m %>% addTiles() %>%
+  addMarkers(lng=-122.660255, lat=45.527369, popup="Where the Magic Happens")
+```
+
+***
+Flexdashboard column space. We can reserve this space for summary text, etc. In the storyboard format, you're limited to one commentary column.
+
+- Bullet points.
+
+- More bullet points.
+
+- Etc.
+
+### Another Page
+
+
+***
+Sidebar commentary
+
+### D3 Heatmap example. You can start to see how this format works a bit better for sequentially summarizing data.
+
+```{r}
+cars2017 <- read.csv("cars2017.csv", row.names=1)
+library(d3heatmap)
+d3heatmap(cars2017, scale="column", dendrogram="none")
+```
+
+***
+An example using d3heatmap library.
+
