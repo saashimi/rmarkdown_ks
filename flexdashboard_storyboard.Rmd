@@ -14,7 +14,7 @@ library(flexdashboard)
 ```{r}
 library(leaflet)
 m <- leaflet() 
-  m %>% addTiles() %>%
+  m %>% addProviderTiles(providers$CartoDB.Positron) %>%
   addMarkers(lng=-122.660255, lat=45.527369, popup="Where the Magic Happens")
 ```
 
@@ -44,12 +44,17 @@ An example of visualizing car data using d3heatmap library.
 ```{r}
 GoT <- read.csv("GoT_actors.csv")
 library("plotly")
+
 p <- plot_ly(
   GoT, 
-  x = ~season.1, 
-  y = ~actor, 
-  type = 'bar'
-)
+  x = ~season.1, y = ~actor, type = 'bar', name= 'Season 1') %>%
+  add_trace(x = ~season.2, name = 'Season 2') %>%
+  add_trace(x = ~season.3, name = 'Season 3') %>%
+  add_trace(x = ~season.4, name = 'Season 4') %>%
+  add_trace(x = ~season.5, name = 'Season 5') %>%
+  add_trace(x = ~season.6, name = 'Season 6') %>%
+  add_trace(x = ~season.7, name = 'Season 7') %>%
+  layout(xaxis = list(title = 'total screen time'), barmode = 'stack')
 p
 ```
 
